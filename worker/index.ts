@@ -156,37 +156,17 @@ export class MyDurableObject extends DurableObject<Env> {
 }
 
 export default {
-  async fetch(request, env, ctx): Promise<Response> {
-    if (request.method === "GET") {
-      // Expect to receive a WebSocket Upgrade request.
-      // If there is one, accept the request and return a WebSocket Response.
-      const upgradeHeader = request.headers.get("Upgrade");
-      if (!upgradeHeader || upgradeHeader !== "websocket") {
-        return new Response(null, {
-          status: 426,
-          statusText: "Durable Object expected Upgrade: websocket",
-          headers: {
-            "Content-Type": "text/plain",
-          },
-        });
-      }
+  async fetch(request: Request, env: Env) {
+    const url = new URL(request.url);
 
-      //users request lobbies for now
-      const url = new URL(request.url);
-      const id = url.searchParams.get("lobby") ?? "default";
-      let stub = env.MY_DURABLE_OBJECT.getByName(id);
-
-      // The Durable Object's fetch handler will accept the server side connection and return
-      // the client
+   
+    if (request.headers.get("Upgrade") === "websocket") {
+      const lobby = url.searchParams.get("lobby") ?? "default";
+      const stub = env.MY_DURABLE_OBJECT.getByName(lobby);
       return stub.fetch(request);
     }
 
-    return new Response(null, {
-      status: 400,
-      statusText: "Bad Request",
-      headers: {
-        "Content-Type": "text/plain",
-      },
-    });
+    // Everything else → React SPA
+    return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

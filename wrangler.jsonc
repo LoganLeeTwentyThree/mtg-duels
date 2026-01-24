@@ -1,11 +1,12 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "cloudflare-vite-tutorial",
+  "name": "mtg-duels",
   "compatibility_date": "2025-04-03",
   "account_id" : "2e4337aaf38ee2483df2d687a1f8404a",
   "assets": {
     "directory": "./src",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
   },
   "durable_objects": {
     "bindings": [
