@@ -1,19 +1,44 @@
 import "./App.css";
-import useWebSocket from 'react-use-websocket';
+import useWebSocket, { ReadyState }  from 'react-use-websocket';
 import Timer from "./Timer";
 import * as Scry from "scryfall-sdk";
+import { useState } from "react";
 
 type GameState = {
   guessedCards: Array<Scry.Card>,
   playerIndex: number,
   activePlayer: number, 
   lastGuessTimeStamp: Date | null,
-  playerNames: Array<string>
+  playerNames: Array<string>,
+  toast?: string
 }
 
 export default function Game(props: {lobbyCode : string, name: string}) {
 
-  const { sendMessage, lastMessage } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
+  const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
+  const [winningPlayer, setWinningPlayer] = useState<number>(-1)
+
+  const connectionStatus = {
+    [ReadyState.CONNECTING]: 'Connecting',
+    [ReadyState.OPEN]: 'Open',
+    [ReadyState.CLOSING]: 'Closing',
+    [ReadyState.CLOSED]: 'Closed',
+    [ReadyState.UNINSTANTIATED]: 'Uninstantiated',
+  }[readyState];
+
+  if(connectionStatus === 'Closed')
+  {
+    window.location.reload()
+  }
+  
+  if (connectionStatus === 'Connecting')
+  {
+    return (
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Connecting...</div>
+      </div>
+    )
+  }
 
   let gameState : GameState | null = null
   let timeRemaining = null
@@ -44,25 +69,23 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     theirBG = "bg-green-100" 
   }
 
-  let otherName = gameState?.playerIndex == 0 ? 1 : 0
+  let otherName = gameState?.playerIndex! ^ 1
 
 
   return (
-    <div className="flex flex-col items-center h-screen w-screen bg-black">
-      <div className="w-full h-20 bg-white">NavBAR!!</div>
-      <div className="flex flex-col size-full bg-black-100 text-center p-10 min-w-5xl max-w-7xl">
+    <div className="static flex flex-col items-center flex-1 bg-gray-500">
+      <div className="w-full h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
+      {winningPlayer > -1 && <div className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4">
+        {winningPlayer == gameState?.playerIndex && <div>You won :D</div>}
+        {winningPlayer != gameState?.playerIndex && <div>You lost :(</div>}
+      </div>}
+      <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
+        {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
         <div id="playerContainer" className="flex flex-row justify-between w-full">
           <div className={`justify-self-start ${myBG} h-20 w-100 flex flex items-center justify-center`}><div>{props.name}</div></div>
           {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
             {
-                if(gameState!.activePlayer == gameState!.playerIndex)
-                {
-                    alert("You LOST!")
-                }else
-                {
-                    alert("You WON!")
-                }
-                
+                setWinningPlayer(gameState!.activePlayer ^ 1)
             }}/>
             }
           <div className={`justify-self-end ${theirBG} h-20 w-100 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>

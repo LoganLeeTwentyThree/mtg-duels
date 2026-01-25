@@ -34,14 +34,14 @@ export class MyDurableObject extends DurableObject<Env> {
     }
   }
 
+  async getPlayers() : Promise<number>
+  {
+    return this.currentGameState.playerNames.length
+  }
 
   async fetch(request: Request): Promise<Response> {
-    if( this.currentGameState.playerNames.length >= 2)
-    {
-      return new Response(null, {
-        status: 409
-      })
-    }
+
+    const url = new URL(request.url)
 
     // Creates two ends of a WebSocket connection.
     const webSocketPair = new WebSocketPair();
@@ -50,7 +50,7 @@ export class MyDurableObject extends DurableObject<Env> {
     
     // save id for persistence between hibernations
     const id = this.currentGameState.playerNames.length
-    const url = new URL(request.url)
+    
     this.currentGameState.playerNames.push(url.searchParams.get("name") ?? "No Name Nelly")
     this.sessions.set(server, id)
     server.serializeAttachment(id)
@@ -112,7 +112,6 @@ export class MyDurableObject extends DurableObject<Env> {
 
     Scry.setAgent("Collossal2Dreadmaw", "1.0.0")
     let messageObj = JSON.parse(message as string)
-    console.log(this.currentGameState)
     if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer)
     {
       const guessedCard : Scry.Card = await Scry.Cards.byName(messageObj.card)
@@ -123,6 +122,9 @@ export class MyDurableObject extends DurableObject<Env> {
         this.currentGameState.lastGuessTimeStamp = new Date()
         this.currentGameState.activePlayer == 0 ? this.currentGameState.activePlayer = 1 : this.currentGameState.activePlayer = 0
         this.updateClients()
+      }else
+      {
+        this.updateClients(`Invalid guess: ${guessedCard.name}`)
       }
       
     }else if (messageObj.command === "poll")
@@ -131,13 +133,13 @@ export class MyDurableObject extends DurableObject<Env> {
     } 
   }
 
-  updateClients()
+  updateClients(toast? : string)
   {
     this.ctx.storage.kv.put("gamestate", this.currentGameState)
     for( const ws of this.ctx.getWebSockets())
     {      
       ws.send(
-        JSON.stringify({...this.currentGameState, playerIndex: this.sessions.get(ws)}),
+        JSON.stringify({...this.currentGameState, playerIndex: this.sessions.get(ws), toast: toast}),
       );
     }
   }
@@ -159,14 +161,23 @@ export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
 
-   
     if (request.headers.get("Upgrade") === "websocket") {
       const lobby = url.searchParams.get("lobby") ?? "default";
       const stub = env.MY_DURABLE_OBJECT.getByName(lobby);
+
+      if((await stub.getPlayers()) >= 2)
+      {
+        return new Response(JSON.stringify({error: "Server is full"}), {
+          status: 403,
+          headers: {
+            'Content-Type' : 'application/json'
+          }
+        })
+      }
+      
       return stub.fetch(request);
     }
 
-    // Everything else → React SPA
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
