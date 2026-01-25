@@ -20,6 +20,7 @@ export class MyDurableObject extends DurableObject<Env> {
   sessions : Map<WebSocket, number> = new Map()
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    Scry.setAgent("mtg-duels", "1.0.0")
     const oldState : GameState | null | undefined = this.ctx.storage.kv.get("gamestate")
 
     //if there is existing state and one or more existing websocket connections
@@ -47,13 +48,27 @@ export class MyDurableObject extends DurableObject<Env> {
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
 
-    
     // save id for persistence between hibernations
     const id = this.currentGameState.playerNames.length
     
     this.currentGameState.playerNames.push(url.searchParams.get("name") ?? "No Name Nelly")
     this.sessions.set(server, id)
     server.serializeAttachment(id)
+
+    if(await this.getPlayers() < 2)
+    {
+      try{
+        const random = await Scry.Cards.random()
+        if(random != undefined)
+        {
+          this.currentGameState.guessedCards.push(random)
+        }
+      }catch (caught){
+        console.log(caught)
+      }
+      
+      
+    }
     
     
 
@@ -74,8 +89,13 @@ export class MyDurableObject extends DurableObject<Env> {
     {
       return false
     }
-
+    
     const guessedCards = this.currentGameState.guessedCards
+
+    if(guessedCards.reduce((acc, ele) => (acc || guess.name == ele.name), false))
+    {
+      return false
+    } 
 
     if(guessedCards.length == 0)
     {
@@ -84,10 +104,10 @@ export class MyDurableObject extends DurableObject<Env> {
 
     const previousGuess = guessedCards[guessedCards.length - 1]
 
-    if(guessedCards.includes(guess))
+    if(previousGuess.set == guess.set)
     {
-      return false
-    } 
+      return true
+    }
 
     if(previousGuess.cmc == guess.cmc)
     {
@@ -109,22 +129,28 @@ export class MyDurableObject extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-
-    Scry.setAgent("Collossal2Dreadmaw", "1.0.0")
     let messageObj = JSON.parse(message as string)
-    if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer)
+    if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer && (await this.getPlayers()) == 2)
     {
-      const guessedCard : Scry.Card = await Scry.Cards.byName(messageObj.card)
+      
+      const result = Scry.Cards.search(`game:paper not:reprint name:${messageObj.card}`).all()
+      let guessedCard : Scry.Card | void = ((await result.next()).value)
 
-      if(this.isLegalPlay(guessedCard))
+      if(guessedCard == null || guessedCard == undefined)
       {
-        this.currentGameState.guessedCards.push(guessedCard)
+        this.updateClients("Invalid card")
+        return
+      }
+
+      if(this.isLegalPlay(guessedCard!))
+      {
+        this.currentGameState.guessedCards.push(guessedCard!)
         this.currentGameState.lastGuessTimeStamp = new Date()
         this.currentGameState.activePlayer == 0 ? this.currentGameState.activePlayer = 1 : this.currentGameState.activePlayer = 0
         this.updateClients()
       }else
       {
-        this.updateClients(`Invalid guess: ${guessedCard.name}`)
+        this.updateClients(`Invalid guess: ${guessedCard!.name}`)
       }
       
     }else if (messageObj.command === "poll")

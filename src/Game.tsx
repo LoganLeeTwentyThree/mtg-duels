@@ -2,7 +2,9 @@ import "./App.css";
 import useWebSocket, { ReadyState }  from 'react-use-websocket';
 import Timer from "./Timer";
 import * as Scry from "scryfall-sdk";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { motion } from "motion/react"
+
 
 type GameState = {
   guessedCards: Array<Scry.Card>,
@@ -17,6 +19,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
   const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
   const [winningPlayer, setWinningPlayer] = useState<number>(-1)
+  const [searchResults, setSearchResults] = useState<Array<string>>([])
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const connectionStatus = {
     [ReadyState.CONNECTING]: 'Connecting',
@@ -45,7 +49,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if(lastMessage != null)
   {
     gameState = JSON.parse(lastMessage?.data)
-    console.log(gameState)
+
     if(gameState!.lastGuessTimeStamp != null)
     {
         timeRemaining = new Date(gameState!.lastGuessTimeStamp)
@@ -73,38 +77,74 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
 
   return (
-    <div className="static flex flex-col items-center flex-1 bg-gray-500">
-      <div className="w-full h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
-      {winningPlayer > -1 && <div className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4">
-        {winningPlayer == gameState?.playerIndex && <div>You won :D</div>}
-        {winningPlayer != gameState?.playerIndex && <div>You lost :(</div>}
-      </div>}
-      <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
-        {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
-        <div id="playerContainer" className="flex flex-row justify-between w-full">
-          <div className={`justify-self-start ${myBG} h-20 w-100 flex flex items-center justify-center`}><div>{props.name}</div></div>
-          {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
-            {
-                setWinningPlayer(gameState!.activePlayer ^ 1)
-            }}/>
-            }
-          <div className={`justify-self-end ${theirBG} h-20 w-100 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
-        </div>
-        <div id="chainContainer" className="mt-10 h-100 w-full overflow-y-scroll [scrollbar-width:none]">
-          {gameState != null && gameState.guessedCards.reverse().map((e : Scry.Card, i : number) => 
-            (
-              <div className="flex flex-col items-center justify-center h-fit" key={i}>
-                <div className="w-5 bg-pink-100 h-10"></div>
-                <div className="flex justify-center items-center bg-white rounded-xl w-60 h-fit text-center p-5"><img src={e.image_uris?.small}></img></div>
-              </div>
-            ))}
-        </div>
-        <input type="text" className="bg-white p-5 rounded-xl" onKeyDown={(e) => {
-          if (e.key == "Enter" ) {
-            sendMessage(JSON.stringify({command:"guess", card: e.currentTarget.value})
-          )}
+    <div className="w-full h-full flex flex-col items-center bg-gray-500">
+      <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
+      <div className="w-5xl h-full flex flex-col items-center bg-gray-700 p-5">
+        {winningPlayer > -1 && <div className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4">
+          {winningPlayer == gameState?.playerIndex && <div className="text-center p-5 z-99">You won :D</div>}
+          {winningPlayer != gameState?.playerIndex && <div className="text-center p-5 z-99">You lost :(</div>}
+        </div>}
+        <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
+          {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
+          <div id="playerContainer" className="flex flex-row justify-between w-full">
+            <div className={`justify-self-start ${myBG} h-20 w-100 flex flex items-center justify-center`}><div>{props.name}</div></div>
+            {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
+              {
+                  setWinningPlayer(gameState!.activePlayer ^ 1)
+              }}/>
+              }
+            <div className={`justify-self-end ${theirBG} h-20 w-100 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
+          </div>
+          
+          <input 
+            type="text" 
+            placeholder="Search for a Magic card..."
+            className="static bg-white p-5 mt-5 rounded-xl w-full" 
+            ref={searchRef}
+            onChange={(e) => {
+              Scry.Cards.autoCompleteName(e.target.value).then((result) => setSearchResults(result))
           }}></input>
-      </div>    
+          <div className="overflow-y-auto overflow-x-hidden h-40 z-10">
+            {searchResults.slice(0, 5).map((e, index) => <div 
+              key={index} 
+              className="bg-white m-2 p-2 h-10 hover:bg-gray-300 hover:scale-105"
+              onClick={() => {
+                sendMessage(JSON.stringify({command:"guess", card: e}))
+                searchRef.current!.value = ""
+                setSearchResults([])
+              }}
+              >
+                {e}
+              </div>)
+            }
+          </div>
+          
+          <div id="chainContainer" className="mt-10 h-100 w-full overflow-y-scroll [scrollbar-width:none]">
+            {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
+              (
+                <div className="flex flex-col items-center justify-center h-fit" key={e.name}>
+                  {i != 0 && <motion.div
+                    key={`${e.name}-connector`}
+                    className="w-5 bg-pink-100"
+                    initial={ {height: i == 1 ? 0 : 40} }
+                    animate={{ height: i == 1 ? 40 : 40 }}
+                    transition={{ duration: 1 }}
+                  />}
+                  <motion.div
+                    key={`${e.name}-card`} 
+                    className="flex justify-center items-center bg-white rounded-xl w-60 h-fit text-center p-5"
+                    initial={ {opacity: i == 0 ? 0 : 100} }
+                    animate={{ opacity: 100 }}
+                    transition={{ duration: 1 }}
+                    >
+                      <img src={e.image_uris?.small}></img>
+                    </motion.div>
+                </div>
+              ))}
+          </div>
+          
+        </div>    
+      </div>
     </div>
   );
 }

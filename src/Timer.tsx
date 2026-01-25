@@ -8,6 +8,6 @@
         } = useTimer({ expiryTimestamp: props.expiryTimeStamp, onExpire: props.onExpire});
 
     return (
-        <div className="bg-white h-20 w-50">{seconds}</div>
+        <div className="flex items-center bg-white h-20 w-50 text-5xl"><div className='text-center'>{seconds}</div></div>
     )
  }
