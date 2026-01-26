@@ -77,23 +77,25 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
 
   return (
-    <div className="w-full h-full flex flex-col items-center bg-gray-500">
+    <div className="w-full min-h-screen flex flex-col items-center bg-gray-500">
       <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
       <div className="w-5xl h-full flex flex-col items-center bg-gray-700 p-5">
-        {winningPlayer > -1 && <div className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4">
-          {winningPlayer == gameState?.playerIndex && <div className="text-center p-5 z-99">You won :D</div>}
-          {winningPlayer != gameState?.playerIndex && <div className="text-center p-5 z-99">You lost :(</div>}
-        </div>}
+        {winningPlayer > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
+          {winningPlayer == gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
+          {winningPlayer != gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
+          <button className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
+          <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
+        </motion.div>}
         <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
           {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
           <div id="playerContainer" className="flex flex-row justify-between w-full">
-            <div className={`justify-self-start ${myBG} h-20 w-100 flex flex items-center justify-center`}><div>{props.name}</div></div>
+            <div className={`justify-self-start ${myBG} h-20 w-80 flex flex items-center justify-center`}><div>{props.name}</div></div>
             {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
                   setWinningPlayer(gameState!.activePlayer ^ 1)
               }}/>
               }
-            <div className={`justify-self-end ${theirBG} h-20 w-100 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
+            <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
           </div>
           
           <input 
@@ -119,17 +121,23 @@ export default function Game(props: {lobbyCode : string, name: string}) {
             }
           </div>
           
-          <div id="chainContainer" className="mt-10 h-100 w-full overflow-y-scroll [scrollbar-width:none]">
+          <div id="chainContainer" className="mt-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
             {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
               (
                 <div className="flex flex-col items-center justify-center h-fit" key={e.name}>
                   {i != 0 && <motion.div
                     key={`${e.name}-connector`}
-                    className="w-5 bg-pink-100"
-                    initial={ {height: i == 1 ? 0 : 40} }
-                    animate={{ height: i == 1 ? 40 : 40 }}
+                    className="flex flex-col items-center justify-center w-5 bg-pink-200 overflow-x-visible"
+                    initial={ {height: i == 1 ? 0 : 120} }
+                    animate={{ height: i == 1 ? 120 : 120 }}
                     transition={{ duration: 1 }}
-                  />}
+                  >
+                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black">Cmc - {e.cmc}</div>}
+                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black">Set - {e.set}</div>}
+                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black">Power - {e.power}</div>}
+                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black">Tougness - {e.toughness}</div>}
+
+                  </motion.div>}
                   <motion.div
                     key={`${e.name}-card`} 
                     className="flex justify-center items-center bg-white rounded-xl w-60 h-fit text-center p-5"

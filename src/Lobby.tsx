@@ -49,7 +49,7 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
     
 
     return (
-    <div className="flex flex-col justify-center items-center bg-black size-full">
+    <div className="flex flex-col justify-center items-center bg-black h-screen w-screen">
         <div className="text-white text-5xl">MTGDuels</div>
         <div className="flex flex-col items-center bg-gray-500 size-80 m-5 p-5 border-2 border-gray-700 rounded-xl">
             {showTutorial && tutorial}

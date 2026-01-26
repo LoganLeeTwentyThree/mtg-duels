@@ -85,7 +85,7 @@ export class MyDurableObject extends DurableObject<Env> {
 
   isLegalPlay(guess : Scry.Card) : boolean 
   {
-    if(guess.type_line.includes("land"))
+    if(guess.type_line.includes("Land"))
     {
       return false
     }
@@ -133,25 +133,34 @@ export class MyDurableObject extends DurableObject<Env> {
     if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer && (await this.getPlayers()) == 2)
     {
       
-      const result = Scry.Cards.search(`game:paper not:reprint name:${messageObj.card}`).all()
-      let guessedCard : Scry.Card | void = ((await result.next()).value)
-
-      if(guessedCard == null || guessedCard == undefined)
+      
+      try{
+        const result = Scry.Cards.search(`game:paper not:reprint !"${messageObj.card}"`).all()
+        const guessedCard : Scry.Card | void = ((await result.next()).value)
+        
+        if(guessedCard == null || guessedCard == undefined)
+        {
+          this.updateClients("Invalid card")
+          return
+        }
+        
+        if(this.isLegalPlay(guessedCard!))
+        {
+          this.currentGameState.guessedCards.push(guessedCard!)
+          this.currentGameState.lastGuessTimeStamp = new Date()
+          this.currentGameState.activePlayer == 0 ? this.currentGameState.activePlayer = 1 : this.currentGameState.activePlayer = 0
+          this.updateClients()
+        }else
+        {
+          this.updateClients(`Invalid guess: ${guessedCard!.name}`)
+        }
+      }catch (e)
       {
-        this.updateClients("Invalid card")
-        return
+        console.log(e)
       }
+      
 
-      if(this.isLegalPlay(guessedCard!))
-      {
-        this.currentGameState.guessedCards.push(guessedCard!)
-        this.currentGameState.lastGuessTimeStamp = new Date()
-        this.currentGameState.activePlayer == 0 ? this.currentGameState.activePlayer = 1 : this.currentGameState.activePlayer = 0
-        this.updateClients()
-      }else
-      {
-        this.updateClients(`Invalid guess: ${guessedCard!.name}`)
-      }
+      
       
     }else if (messageObj.command === "poll")
     {

@@ -9,7 +9,7 @@ export default function App() {
   const [lobbyCodeAndName, setLobbyCodeAndName] = useState<Array<string>>([])
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col min-h-screen">
       {lobbyCodeAndName.length == 0 && (
         <div className="flex-1"> 
           <Lobby callback={setLobbyCodeAndName} />
