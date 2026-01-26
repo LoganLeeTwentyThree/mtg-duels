@@ -106,15 +106,15 @@ export default function Game(props: {lobbyCode : string, name: string}) {
           <input 
             type="text" 
             placeholder="Search for a Magic card..."
-            className="static bg-white p-5 mt-5 rounded-xl w-full" 
+            className="static bg-white p-5 mt-5 w-full" 
             ref={searchRef}
             onChange={(e) => {
               Scry.Cards.autoCompleteName(e.target.value).then((result) => setSearchResults(result))
           }}></input>
-          <div className="overflow-y-auto overflow-x-hidden h-40 z-10">
+          <div className="grid grid-rows-5 divide-y divide-solid divide-gray-300 overflow-y-hidden overflow-x-hidden h-40 z-10">
             {searchResults.slice(0, 5).map((e, index) => <div 
               key={index} 
-              className="bg-white m-2 p-2 h-10 hover:bg-gray-300 hover:scale-105"
+              className="bg-white align-middle p-2 hover:bg-gray-300 hover:scale-105"
               onClick={() => {
                 sendMessage(JSON.stringify({command:"guess", card: e}))
                 searchRef.current!.value = ""
@@ -126,27 +126,27 @@ export default function Game(props: {lobbyCode : string, name: string}) {
             }
           </div>
           
-          <div id="chainContainer" className="mt-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
+          <div id="chainContainer" className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
             {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
               (
                 <div className="flex flex-col items-center justify-center h-fit" key={e.name}>
                   {i != 0 && <motion.div
                     key={`${e.name}-connector`}
-                    className="flex flex-col items-center justify-center w-5 bg-pink-200 overflow-x-visible"
+                    className="flex flex-col items-center justify-center w-5 bg-pink-200 overflow-x-visible shadow-md shadow-pink-500/100"
                     initial={ {height: i == 1 ? 0 : 120} }
                     animate={{ height: i == 1 ? 120 : 120 }}
                     transition={{ duration: 1 }}
                   >
-                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Cmc - {e.cmc}</div>}
-                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Set - {e.set}</div>}
-                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Power - {e.power}</div>}
-                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Tougness - {e.toughness}</div>}
+                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Cmc - {e.cmc}</div>}
+                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Set - {e.set}</div>}
+                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Power - {e.power}</div>}
+                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Tougness - {e.toughness}</div>}
 
                   </motion.div>}
                   <motion.div
                     key={`${e.name}-card`} 
-                    className={"flex justify-center items-center bg-white rounded-xl w-60 text-center overflow-y-hidden" + (i == 0 ? " border-4 border-pink-300" : "")}
-                    initial={ {opacity: i == 0 ? 0 : 100, height: i == 0 ? 0 : "204px"} }
+                    className={"flex justify-center items-center bg-white rounded-xl w-60 text-center overflow-y-hidden" + (i == 0 ? " border-4 border-pink-300 shadow-md shadow-pink-500/100" : "")}
+                    initial={ {opacity: i == 0 ? 0 : 100, height: i == 0 ? 0 : "250px"} }
                     animate={{ opacity: 100, height: "250px" }}
                     transition={{ duration: 1 }}
                     >

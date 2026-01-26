@@ -20,7 +20,7 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
 
     const body = 
     <div>
-        <div className="w-full text-xl border-2 border-gray-700 bg-gray-600 p-2 mb-5">Join a lobby</div>
+        <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">Join a lobby</div>
         <form className="flex flex-col" onSubmit={() => 
             {
                 cookieStore.set("name", nameRef.current?.value ?? "")
@@ -38,7 +38,7 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
 
     const tutorial = 
     <div>
-        <div className="w-full text-xl border-2 border-gray-700 bg-gray-600 p-2 mb-5">How to Play</div>
+        <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">How to Play</div>
         <div className="m-5">Take turns naming magic cards that relate to each other by having the same mana value (cmc), power, toughness, or set. The first one to fail to name a card in 20 seconds loses!</div>
         <button onClick={() => setShowTutorial(false)} className="self-end m-auto p-1 bg-white text-black hover:bg-gray-300 hover:scale-105">Back</button>
     </div>
@@ -51,7 +51,7 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
     return (
     <div className="flex flex-col justify-center items-center bg-black h-screen w-screen">
         <div className="text-white text-5xl">MTGDuels</div>
-        <div className="flex flex-col items-center bg-gray-500 size-80 m-5 p-5 border-2 border-gray-700 rounded-xl">
+        <div className="flex flex-col items-center bg-gray-500 size-80 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
             {showTutorial && tutorial}
             {!showTutorial && body}
         </div>
