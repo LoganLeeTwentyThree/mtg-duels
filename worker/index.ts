@@ -6,6 +6,7 @@ type GameState = {
   activePlayer: 0 | 1, 
   playerNames: Array<string>,
   lastGuessTimeStamp: Date | null,
+  rematch: Array<boolean>
 }
 
 export class MyDurableObject extends DurableObject<Env> {
@@ -14,7 +15,8 @@ export class MyDurableObject extends DurableObject<Env> {
       guessedCards: new Array(0),
       activePlayer: 0,
       playerNames: [],
-      lastGuessTimeStamp: null
+      lastGuessTimeStamp: null,
+      rematch: [false, false]
   }
   
   sessions : Map<WebSocket, number> = new Map()
@@ -34,6 +36,19 @@ export class MyDurableObject extends DurableObject<Env> {
       }
     }
   }
+
+  async addRandomCard()
+  {
+    try{
+        const random = await Scry.Cards.random()
+        if(random != undefined)
+        {
+          this.currentGameState.guessedCards.push(random)
+        }
+    }catch (caught){
+      console.log(caught)
+    }
+  } 
 
   async getPlayers() : Promise<number>
   {
@@ -57,15 +72,7 @@ export class MyDurableObject extends DurableObject<Env> {
 
     if(await this.getPlayers() < 2)
     {
-      try{
-        const random = await Scry.Cards.random()
-        if(random != undefined)
-        {
-          this.currentGameState.guessedCards.push(random)
-        }
-      }catch (caught){
-        console.log(caught)
-      }
+      await this.addRandomCard()
       
       
     }
@@ -165,7 +172,22 @@ export class MyDurableObject extends DurableObject<Env> {
     }else if (messageObj.command === "poll")
     {
       this.updateClients()
-    } 
+    }else if( messageObj.command === "rematch")
+    {
+      this.currentGameState.rematch[this.sessions.get(ws)!] = true
+      if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
+      {
+        this.currentGameState = {
+          guessedCards: new Array(0),
+          activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
+          playerNames: this.currentGameState.playerNames,
+          lastGuessTimeStamp: null,
+          rematch: [false, false]
+        }
+        await this.addRandomCard()
+        this.updateClients()
+      }
+    }
   }
 
   updateClients(toast? : string)

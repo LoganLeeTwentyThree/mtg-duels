@@ -12,7 +12,8 @@ type GameState = {
   activePlayer: number, 
   lastGuessTimeStamp: Date | null,
   playerNames: Array<string>,
-  toast?: string
+  toast?: string,
+  rematch: Array<boolean>
 }
 
 export default function Game(props: {lobbyCode : string, name: string}) {
@@ -77,13 +78,17 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
 
   return (
-    <div className="w-full min-h-screen flex flex-col items-center bg-gray-500">
+    <div className="w-full min-h-screen flex flex-col items-center bg-gray-700">
       <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
-      <div className="w-5xl h-full flex flex-col items-center bg-gray-700 p-5">
+      <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
         {winningPlayer > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
           {winningPlayer == gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
           {winningPlayer != gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
-          <button className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
+          <button onClick={() => {
+              sendMessage(JSON.stringify({command:"rematch"}))
+              setWinningPlayer(-1)
+            }} 
+            className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
           <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
         </motion.div>}
         <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
@@ -132,20 +137,20 @@ export default function Game(props: {lobbyCode : string, name: string}) {
                     animate={{ height: i == 1 ? 120 : 120 }}
                     transition={{ duration: 1 }}
                   >
-                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black">Cmc - {e.cmc}</div>}
-                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black">Set - {e.set}</div>}
-                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black">Power - {e.power}</div>}
-                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black">Tougness - {e.toughness}</div>}
+                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Cmc - {e.cmc}</div>}
+                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Set - {e.set}</div>}
+                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Power - {e.power}</div>}
+                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2">Tougness - {e.toughness}</div>}
 
                   </motion.div>}
                   <motion.div
                     key={`${e.name}-card`} 
-                    className="flex justify-center items-center bg-white rounded-xl w-60 h-fit text-center p-5"
-                    initial={ {opacity: i == 0 ? 0 : 100} }
-                    animate={{ opacity: 100 }}
+                    className={"flex justify-center items-center bg-white rounded-xl w-60 text-center overflow-y-hidden" + (i == 0 ? " border-4 border-pink-300" : "")}
+                    initial={ {opacity: i == 0 ? 0 : 100, height: i == 0 ? 0 : "204px"} }
+                    animate={{ opacity: 100, height: "250px" }}
                     transition={{ duration: 1 }}
                     >
-                      <img src={e.image_uris?.small}></img>
+                      <img src={e.image_uris?.small || e.card_faces[0].image_uris?.small}></img>
                     </motion.div>
                 </div>
               ))}
