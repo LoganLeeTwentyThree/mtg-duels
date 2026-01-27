@@ -4,6 +4,8 @@ import Timer from "./Timer";
 import * as Scry from "scryfall-sdk";
 import { useRef, useState } from "react";
 import { motion } from "motion/react"
+import Search from "./Search";
+import Matchsettings from "./MatchSettings"
 
 
 type GameState = {
@@ -13,15 +15,24 @@ type GameState = {
   lastGuessTimeStamp: Date | null,
   playerNames: Array<string>,
   toast?: string,
-  rematch: Array<boolean>
+  winner? : -1 | 0 | 1
+  format: string
 }
 
 export default function Game(props: {lobbyCode : string, name: string}) {
 
   const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
-  const [winningPlayer, setWinningPlayer] = useState<number>(-1)
-  const [searchResults, setSearchResults] = useState<Array<string>>([])
-  const searchRef = useRef<HTMLInputElement>(null)
+
+  let refGameState = useRef<GameState>(
+    {
+      guessedCards: [],
+      playerIndex: 0,
+      activePlayer: 0, 
+      lastGuessTimeStamp: null,
+      playerNames: [],
+      format: ""
+    }
+  )
 
   const connectionStatus = {
     [ReadyState.CONNECTING]: 'Connecting',
@@ -45,16 +56,23 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     )
   }
 
-  let gameState : GameState | null = null
+  
   let timeRemaining = null
   if(lastMessage != null)
   {
-    gameState = JSON.parse(lastMessage?.data)
-
-    if(gameState!.lastGuessTimeStamp != null)
+    const data = JSON.parse(lastMessage?.data)
+    console.log(data)
+    if(data.command === "update")
     {
-        timeRemaining = new Date(gameState!.lastGuessTimeStamp)
-        timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
+      const updatedState : Partial<GameState> = JSON.parse(lastMessage?.data).gameState
+      Object.assign(refGameState.current, updatedState) 
+    }else if (data.command === "push")
+    {
+      //this doesnt work yet
+      refGameState.current.guessedCards.push(data.card)
+    }else if (data.command === "settings")
+    {
+      return (<Matchsettings onClick={(e) => sendMessage(JSON.stringify({command: "settings", format: e}))}/>)
     }
     
   }else 
@@ -62,6 +80,23 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     sendMessage(JSON.stringify({command: "poll"}))
   }
   
+  const gameState : GameState | null = refGameState.current
+
+  if(gameState.format == "")
+  {
+    return (
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Waiting for host to select format...</div>
+      </div>
+    )
+  }
+  
+  if(gameState?.lastGuessTimeStamp != null)
+  {
+    timeRemaining = new Date(gameState!.lastGuessTimeStamp)
+    timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
+  }
+
   let myBG
   let theirBG
   if(gameState?.activePlayer == gameState?.playerIndex)
@@ -81,12 +116,11 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     <div className="w-full min-h-screen flex flex-col items-center bg-gray-700">
       <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
       <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
-        {winningPlayer > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
-          {winningPlayer == gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
-          {winningPlayer != gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
+        {gameState.winner! > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
+          {gameState.winner! == gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
+          {gameState.winner! != gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
           <button onClick={() => {
               sendMessage(JSON.stringify({command:"rematch"}))
-              setWinningPlayer(-1)
             }} 
             className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
           <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
@@ -97,35 +131,16 @@ export default function Game(props: {lobbyCode : string, name: string}) {
             <div className={`justify-self-start ${myBG} h-20 w-80 flex flex items-center justify-center`}><div>{props.name}</div></div>
             {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
-                  setWinningPlayer(gameState!.activePlayer ^ 1)
+                  sendMessage(JSON.stringify({command: "over"}))
               }}/>
               }
             <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
           </div>
           
-          <input 
-            type="text" 
-            placeholder="Search for a Magic card..."
-            className="static bg-white p-5 mt-5 w-full" 
-            ref={searchRef}
-            onChange={(e) => {
-              Scry.Cards.autoCompleteName(e.target.value).then((result) => setSearchResults(result))
-          }}></input>
-          <div className="grid grid-rows-5 divide-y divide-solid divide-gray-300 overflow-y-hidden overflow-x-hidden h-40 z-10">
-            {searchResults.slice(0, 5).map((e, index) => <div 
-              key={index} 
-              className="bg-white align-middle p-2 hover:bg-gray-300 hover:scale-105"
-              onClick={() => {
-                sendMessage(JSON.stringify({command:"guess", card: e}))
-                searchRef.current!.value = ""
-                setSearchResults([])
-              }}
-              >
-                {e}
-              </div>)
-            }
-          </div>
-          
+          <Search onClick={(e) => {
+            sendMessage(JSON.stringify({command:"guess", card: e}))
+          }}/>
+
           <div id="chainContainer" className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
             {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
               (

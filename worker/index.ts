@@ -6,7 +6,10 @@ type GameState = {
   activePlayer: 0 | 1, 
   playerNames: Array<string>,
   lastGuessTimeStamp: Date | null,
-  rematch: Array<boolean>
+  rematch: Array<boolean>,
+  toast?: string
+  format: keyof Scry.Legalities | "",
+  winner: -1 | 0 | 1
 }
 
 export class MyDurableObject extends DurableObject<Env> {
@@ -16,7 +19,9 @@ export class MyDurableObject extends DurableObject<Env> {
       activePlayer: 0,
       playerNames: [],
       lastGuessTimeStamp: null,
-      rematch: [false, false]
+      rematch: [false, false],
+      format: "",
+      winner: -1
   }
   
   sessions : Map<WebSocket, number> = new Map()
@@ -24,7 +29,6 @@ export class MyDurableObject extends DurableObject<Env> {
     super(ctx, env);
     Scry.setAgent("mtg-duels", "1.0.0")
     const oldState : GameState | null | undefined = this.ctx.storage.kv.get("gamestate")
-
     //if there is existing state and one or more existing websocket connections
     if(oldState != null && oldState != undefined && this.ctx.getWebSockets().length > 0)
     {
@@ -40,10 +44,12 @@ export class MyDurableObject extends DurableObject<Env> {
   async addRandomCard()
   {
     try{
-        const random = await Scry.Cards.random()
+        const random = await Scry.Cards.random(`format:${this.currentGameState.format}`)
         if(random != undefined)
         {
-          this.currentGameState.guessedCards.push(random)
+          this.updateGameState({
+            guessedCards: [...this.currentGameState.guessedCards, random],
+          })
         }
     }catch (caught){
       console.log(caught)
@@ -73,11 +79,7 @@ export class MyDurableObject extends DurableObject<Env> {
     if(await this.getPlayers() < 2)
     {
       await this.addRandomCard()
-      
-      
     }
-    
-    
 
     // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
     // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
@@ -104,6 +106,11 @@ export class MyDurableObject extends DurableObject<Env> {
       return false
     } 
 
+    const format = this.currentGameState.format as keyof typeof guess.legalities
+    if (!guess.isLegal(format)) {
+      return false
+    }
+
     if(guessedCards.length == 0)
     {
       return true
@@ -111,7 +118,7 @@ export class MyDurableObject extends DurableObject<Env> {
 
     const previousGuess = guessedCards[guessedCards.length - 1]
 
-    if(previousGuess.set == guess.set)
+    if(previousGuess.set === guess.set)
     {
       return true
     }
@@ -137,29 +144,32 @@ export class MyDurableObject extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
     let messageObj = JSON.parse(message as string)
-    if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer && (await this.getPlayers()) == 2)
+
+    //if its a guess from the active player, and there are two players, and the time hasnt run out
+    if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer && (await this.getPlayers()) == 2 && (!this.currentGameState.lastGuessTimeStamp || new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp!.getSeconds() < 20 ))
     {
-      
-      
       try{
         const result = Scry.Cards.search(`game:paper not:reprint !"${messageObj.card}"`).all()
         const guessedCard : Scry.Card | void = ((await result.next()).value)
         
         if(guessedCard == null || guessedCard == undefined)
         {
-          this.updateClients("Invalid card")
+          this.updateGameState({toast: "Invalid card"})
           return
         }
         
         if(this.isLegalPlay(guessedCard!))
         {
-          this.currentGameState.guessedCards.push(guessedCard!)
-          this.currentGameState.lastGuessTimeStamp = new Date()
-          this.currentGameState.activePlayer == 0 ? this.currentGameState.activePlayer = 1 : this.currentGameState.activePlayer = 0
-          this.updateClients()
+          this.updateGameState(
+            {
+              guessedCards: [...this.currentGameState.guessedCards, guessedCard],
+              lastGuessTimeStamp: new Date(),
+              activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
+              toast: ""
+            })
         }else
         {
-          this.updateClients(`Invalid guess: ${guessedCard!.name}`)
+          this.updateGameState({toast: `Invalid guess: ${guessedCard!.name}`})
         }
       }catch (e)
       {
@@ -171,32 +181,64 @@ export class MyDurableObject extends DurableObject<Env> {
       
     }else if (messageObj.command === "poll")
     {
-      this.updateClients()
+      
+      if(this.sessions.get(ws) == 0)
+      {
+        ws.send(JSON.stringify({command: "settings"}))
+      }else
+      {
+        if(this.currentGameState.format !== "")
+        {
+          this.initializeClientState()
+        }
+        
+      }
     }else if( messageObj.command === "rematch")
     {
       this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
-        this.currentGameState = {
+        this.updateGameState({
           guessedCards: new Array(0),
           activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
           playerNames: this.currentGameState.playerNames,
           lastGuessTimeStamp: null,
-          rematch: [false, false]
-        }
+          rematch: [false, false],
+          winner: -1
+        })
         await this.addRandomCard()
-        this.updateClients()
       }
+    }else if (messageObj.command === "over")
+    {
+      this.updateGameState({winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
+    }else if( messageObj.command === "settings")
+    {
+      this.initializeClientState()
+      this.updateGameState({format: messageObj.format})
     }
   }
 
-  updateClients(toast? : string)
+  initializeClientState()
   {
-    this.ctx.storage.kv.put("gamestate", this.currentGameState)
     for( const ws of this.ctx.getWebSockets())
     {      
       ws.send(
-        JSON.stringify({...this.currentGameState, playerIndex: this.sessions.get(ws), toast: toast}),
+        JSON.stringify({command: "update", gameState: {...this.currentGameState, playerIndex: this.sessions.get(ws)}}),
+      );
+    }
+  }
+
+  updateGameState(newState? : Partial<GameState>)
+  {
+
+    Object.assign(this.currentGameState, newState)
+    this.ctx.storage.kv.put("gamestate", this.currentGameState)
+    
+
+    for( const ws of this.ctx.getWebSockets())
+    {      
+      ws.send(
+        JSON.stringify({command: "update", gameState: {...newState, playerIndex: this.sessions.get(ws)}}),
       );
     }
   }
@@ -207,9 +249,14 @@ export class MyDurableObject extends DurableObject<Env> {
     reason: string,
     wasClean: boolean,
   ) {
-    // If the client closes the connection, the runtime will invoke the webSocketClose() handler.
-    this.ctx.storage.kv.delete("gamestate")
-    ws.close(code, "Durable Object is closing WebSocket");
+
+    // If a client closes their connection, kick the other player and die
+    this.ctx.storage.deleteAll()
+    for( const ws of this.ctx.getWebSockets())
+    {      
+      ws.close(code, "Durable Object is closing WebSocket");
+    }
+    
   }
 
 }
