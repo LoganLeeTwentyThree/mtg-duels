@@ -1,34 +1,10 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Scry from "scryfall-sdk";
-
-type Player = {
-  name : string,
-  kit : string,
-}
-
-type GameState = {
-  guessedCards: Array<Scry.Card>,
-  activePlayer: 0 | 1, 
-  playerNames: Array<string>,
-  lastGuessTimeStamp: Date | null,
-  rematch: Array<boolean>,
-  toast?: string
-  format: keyof Scry.Legalities | "",
-  winner: -1 | 0 | 1,
-}
+import { NAME_TO_KIT, GameState } from "./../types"
+import type { Player } from "./../types";
 
 export class MyDurableObject extends DurableObject<Env> {
-
-  currentGameState : GameState = {
-      guessedCards: new Array(0),
-      activePlayer: 0,
-      playerNames: [],
-      lastGuessTimeStamp: null,
-      rematch: [false, false],
-      format: "",
-      winner: -1
-  }
-  
+  currentGameState : GameState =  new GameState()
   sessions : Map<WebSocket, number> = new Map()
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -49,7 +25,7 @@ export class MyDurableObject extends DurableObject<Env> {
   async addRandomCard()
   {
     try{
-        const random = await Scry.Cards.random(`format:${this.currentGameState.format}`)
+        const random = await Scry.Cards.random(`format:${this.currentGameState.format} -type:land`)
         if(random != undefined)
         {
           this.updateGameState(true,{
@@ -63,7 +39,7 @@ export class MyDurableObject extends DurableObject<Env> {
 
   async getPlayers() : Promise<number>
   {
-    return this.currentGameState.playerNames.length
+    return this.currentGameState.players.length
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -75,16 +51,11 @@ export class MyDurableObject extends DurableObject<Env> {
     const [client, server] = Object.values(webSocketPair);
 
     // save id for persistence between hibernations
-    const id = this.currentGameState.playerNames.length
+    const id = await this.getPlayers()
     
-    this.currentGameState.playerNames.push(url.searchParams.get("name") ?? "No Name Nelly")
+    this.currentGameState.players.push({name: url.searchParams.get("name") ?? "No Name Nelly", kit: "None", points: 0})
     this.sessions.set(server, id)
     server.serializeAttachment(id)
-
-    if(await this.getPlayers() < 2)
-    {
-      await this.addRandomCard()
-    }
 
     // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
     // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
@@ -149,13 +120,16 @@ export class MyDurableObject extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
     let messageObj = JSON.parse(message as string)
+    const id = this.sessions.get(ws)
 
     //if its a guess from the active player, and there are two players, and the time hasnt run out
-    if( messageObj.command === "guess" && this.sessions.get(ws) == this.currentGameState.activePlayer && (await this.getPlayers()) == 2 && (!this.currentGameState.lastGuessTimeStamp || new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp!.getSeconds() < 20 ))
-    {
+    if( messageObj.command === "guess" && id == this.currentGameState.activePlayer && (await this.getPlayers()) == 2 && (!this.currentGameState.lastGuessTimeStamp || new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp!.getSeconds() < 20 ))
+    {      
       try{
-        const result = Scry.Cards.search(`game:paper not:reprint !"${messageObj.card}"`).all()
+        
+        const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${this.currentGameState.format}`).all()
         const guessedCard : Scry.Card | void = ((await result.next()).value)
+        
         
         if(guessedCard == null || guessedCard == undefined)
         {
@@ -167,6 +141,18 @@ export class MyDurableObject extends DurableObject<Env> {
         {
           this.updateGameState(true,
             {
+              players: this.currentGameState.players.map((e, i) => {
+                if( i == id)
+                {
+                  return {
+                    name: e.name,
+                    kit: e.kit,
+                    points: e.points + ((NAME_TO_KIT.get(e.kit) ?? NAME_TO_KIT.get("Creatures")!).isWin(guessedCard) ? 1 : 0)
+                  }
+                }else {
+                  return e
+                }
+              }), //important that players stay at same index
               guessedCards: [...this.currentGameState.guessedCards, guessedCard],
               lastGuessTimeStamp: new Date(),
               activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
@@ -188,38 +174,52 @@ export class MyDurableObject extends DurableObject<Env> {
       this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
-        this.updateGameState(true, {
-          guessedCards: new Array(0),
-          activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
-          playerNames: this.currentGameState.playerNames,
-          lastGuessTimeStamp: null,
-          rematch: [false, false],
-          winner: -1
-        })
+        let newGame = new GameState()
+        newGame.activePlayer = (this.currentGameState.activePlayer ^ 1) as 0 | 1
+        this.updateGameState(false, newGame)
         await this.addRandomCard()
+        this.initializeClientState()
+        
       }
     }else if (messageObj.command === "over")
     {
-      //TODO: Validate game ia actually over
-      this.updateGameState(true, {winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
+      //sometimes this doesnt work ?
+      if(this.currentGameState.lastGuessTimeStamp && new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp?.getSeconds() >= 20 && this.currentGameState.winner == -1)
+      {
+        this.updateGameState(true, {winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
+      }
     }else if( messageObj.command === "settings")
     {
-      if(messageObj.format && this.currentGameState.format === "")
+
+      let id = this.sessions.get(ws)!
+      if(id == 0)//only the host can choose the format
       {
-        this.initializeClientState()
-        this.updateGameState(false, {format: messageObj.format})
+        this.updateGameState(false, {
+          format: messageObj.format
+        })
       }
+
+      this.currentGameState.players[id].kit = messageObj.kit
+      this.updateGameState(false, {}) //serialize kit
+
+      if(this.currentGameState.players[id ^ 1].kit !== "None")
+      {
+        this.addRandomCard() //random card must be added after the format is chosen
+        this.initializeClientState()
+      }
+        
+    
     }
   }
 
   initializeClientState()
   {
     for( const ws of this.ctx.getWebSockets())
-    {      
-      ws.send(
-        JSON.stringify({command: "update", gameState: {...this.currentGameState, playerIndex: this.sessions.get(ws)}}),
-      );
-    }
+      {      
+        ws.send(
+          JSON.stringify({command: "update", gameState: {...this.currentGameState}, playerIndex: this.sessions.get(ws)}),
+        );
+      }
   }
 
   updateGameState(updateClients : boolean, newState : Partial<GameState>)
@@ -233,7 +233,7 @@ export class MyDurableObject extends DurableObject<Env> {
       for( const ws of this.ctx.getWebSockets())
       {      
         ws.send(
-          JSON.stringify({command: "update", gameState: {...newState, playerIndex: this.sessions.get(ws)}}),
+          JSON.stringify({command: "update", gameState: {...newState }, playerIndex: this.sessions.get(ws)}),
         );
       }
     }
@@ -264,7 +264,7 @@ export default {
 
     if (request.headers.get("Upgrade") === "websocket") {
       const lobby = url.searchParams.get("lobby") ?? "default";
-      const stub = env.MY_DURABLE_OBJECT.getByName(lobby);
+      const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
 
       if((await stub.getPlayers()) >= 2)
       {

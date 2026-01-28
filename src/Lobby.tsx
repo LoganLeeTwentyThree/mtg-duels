@@ -8,7 +8,6 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
 
     const [showTutorial, setShowTutorial] = useState(false)
     const [defaultName, setDefaultName] = useState("")
-    const kits : Array<string> = ["Standard Legal", "Universes Beyond", "Alpha", "WUBRG Cards"]
     
     useEffect(() => {
         async function cookie() {

@@ -1,4 +1,3 @@
-import "./App.css";
 import useWebSocket, { ReadyState }  from 'react-use-websocket';
 import Timer from "./Timer";
 import * as Scry from "scryfall-sdk";
@@ -6,31 +5,15 @@ import { useRef, useState } from "react";
 import { motion } from "motion/react"
 import Search from "./Search";
 import Matchsettings from "./MatchSettings"
+import { GameState, NAME_TO_KIT, Player } from "./../types"
 
-
-type GameState = {
-  guessedCards: Array<Scry.Card>,
-  playerIndex: number,
-  activePlayer: number, 
-  lastGuessTimeStamp: Date | null,
-  playerNames: Array<string>,
-  toast?: string,
-  winner? : -1 | 0 | 1
-}
 
 export default function Game(props: {lobbyCode : string, name: string}) {
 
   const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
 
-  let refGameState = useRef<GameState>(
-    {
-      guessedCards: [],
-      playerIndex: 0,
-      activePlayer: 0, 
-      lastGuessTimeStamp: null,
-      playerNames: [],
-    }
-  )
+  let refGameState = useRef<GameState>( new GameState() )
+  let refPlayerIndex = useRef<number>(-1)
 
   const connectionStatus = {
     [ReadyState.CONNECTING]: 'Connecting',
@@ -70,7 +53,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
       refGameState.current.guessedCards.push(data.card)
     }else if (data.command === "settings")
     {
-      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(e) => sendMessage(JSON.stringify({command: "settings", format: e}))}/>)
+      refPlayerIndex.current = data.playerIndex;
+      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit) => sendMessage(JSON.stringify({command: "settings", format: format, kit: kit}))}/>)
     }
     
   }else 
@@ -88,7 +72,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
   let myBG
   let theirBG
-  if(gameState?.activePlayer == gameState?.playerIndex)
+  if(gameState?.activePlayer == refPlayerIndex.current)
   {
     myBG = "bg-green-100"
     theirBG = "bg-gray-100" 
@@ -98,16 +82,14 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     theirBG = "bg-green-100" 
   }
 
-  let otherName = gameState?.playerIndex! ^ 1
-
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center bg-gray-700">
       <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
       <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
         {gameState.winner! > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
-          {gameState.winner! == gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
-          {gameState.winner! != gameState?.playerIndex && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
+          {gameState.winner! == refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
+          {gameState.winner! != refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
           <button onClick={() => {
               sendMessage(JSON.stringify({command:"rematch"}))
             }} 
@@ -117,13 +99,21 @@ export default function Game(props: {lobbyCode : string, name: string}) {
         <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
           {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
           <div id="playerContainer" className="flex flex-row justify-between w-full">
-            <div className={`justify-self-start ${myBG} h-20 w-80 flex flex items-center justify-center`}><div>{props.name}</div></div>
+            <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
+              <div>{props.name}</div>
+              <div>{gameState.players[refPlayerIndex.current]?.kit}</div>
+              <div>{gameState.players[refPlayerIndex.current]?.points} / {NAME_TO_KIT.get(gameState.players[refPlayerIndex.current]?.kit)?.points ?? 10}</div>
+            </div>
             {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
                   sendMessage(JSON.stringify({command: "over"}))
               }}/>
               }
-            <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex items-center justify-center`}>{gameState?.playerNames[otherName]}</div>
+            <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
+              <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
+              <div>{gameState.players[refPlayerIndex.current ^ 1]?.kit}</div>
+              <div>{gameState.players[refPlayerIndex.current ^ 1]?.points} / {NAME_TO_KIT.get(gameState.players[refPlayerIndex.current ^ 1]?.kit)?.points ?? 10}</div>
+            </div>
           </div>
           
           <Search onClick={(e) => {
