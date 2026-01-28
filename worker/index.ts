@@ -1,6 +1,11 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Scry from "scryfall-sdk";
 
+type Player = {
+  name : string,
+  kit : string,
+}
+
 type GameState = {
   guessedCards: Array<Scry.Card>,
   activePlayer: 0 | 1, 
@@ -9,7 +14,7 @@ type GameState = {
   rematch: Array<boolean>,
   toast?: string
   format: keyof Scry.Legalities | "",
-  winner: -1 | 0 | 1
+  winner: -1 | 0 | 1,
 }
 
 export class MyDurableObject extends DurableObject<Env> {
@@ -47,7 +52,7 @@ export class MyDurableObject extends DurableObject<Env> {
         const random = await Scry.Cards.random(`format:${this.currentGameState.format}`)
         if(random != undefined)
         {
-          this.updateGameState({
+          this.updateGameState(true,{
             guessedCards: [...this.currentGameState.guessedCards, random],
           })
         }
@@ -154,13 +159,13 @@ export class MyDurableObject extends DurableObject<Env> {
         
         if(guessedCard == null || guessedCard == undefined)
         {
-          this.updateGameState({toast: "Invalid card"})
+          this.updateGameState(true,{toast: "Invalid card"})
           return
         }
         
         if(this.isLegalPlay(guessedCard!))
         {
-          this.updateGameState(
+          this.updateGameState(true,
             {
               guessedCards: [...this.currentGameState.guessedCards, guessedCard],
               lastGuessTimeStamp: new Date(),
@@ -169,36 +174,21 @@ export class MyDurableObject extends DurableObject<Env> {
             })
         }else
         {
-          this.updateGameState({toast: `Invalid guess: ${guessedCard!.name}`})
+          this.updateGameState(true, {toast: `Invalid guess: ${guessedCard!.name}`})
         }
       }catch (e)
       {
         console.log(e)
       }
-      
-
-      
-      
     }else if (messageObj.command === "poll")
     {
-      
-      if(this.sessions.get(ws) == 0)
-      {
-        ws.send(JSON.stringify({command: "settings"}))
-      }else
-      {
-        if(this.currentGameState.format !== "")
-        {
-          this.initializeClientState()
-        }
-        
-      }
+      ws.send(JSON.stringify({command: "settings", playerIndex: this.sessions.get(ws)}))
     }else if( messageObj.command === "rematch")
     {
       this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
-        this.updateGameState({
+        this.updateGameState(true, {
           guessedCards: new Array(0),
           activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
           playerNames: this.currentGameState.playerNames,
@@ -210,11 +200,15 @@ export class MyDurableObject extends DurableObject<Env> {
       }
     }else if (messageObj.command === "over")
     {
-      this.updateGameState({winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
+      //TODO: Validate game ia actually over
+      this.updateGameState(true, {winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
     }else if( messageObj.command === "settings")
     {
-      this.initializeClientState()
-      this.updateGameState({format: messageObj.format})
+      if(messageObj.format && this.currentGameState.format === "")
+      {
+        this.initializeClientState()
+        this.updateGameState(false, {format: messageObj.format})
+      }
     }
   }
 
@@ -228,19 +222,22 @@ export class MyDurableObject extends DurableObject<Env> {
     }
   }
 
-  updateGameState(newState? : Partial<GameState>)
+  updateGameState(updateClients : boolean, newState : Partial<GameState>)
   {
 
     Object.assign(this.currentGameState, newState)
     this.ctx.storage.kv.put("gamestate", this.currentGameState)
     
-
-    for( const ws of this.ctx.getWebSockets())
-    {      
-      ws.send(
-        JSON.stringify({command: "update", gameState: {...newState, playerIndex: this.sessions.get(ws)}}),
-      );
+    if(updateClients)
+    {
+      for( const ws of this.ctx.getWebSockets())
+      {      
+        ws.send(
+          JSON.stringify({command: "update", gameState: {...newState, playerIndex: this.sessions.get(ws)}}),
+        );
+      }
     }
+    
   }
 
   async webSocketClose(

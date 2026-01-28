@@ -52,12 +52,6 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
                 {showTutorial && tutorial}
                 {!showTutorial && body}
             </div>
-            <div className="flex items-center bg-gray-500 size-80 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
-                <div className="m-auto flex flex-col">
-                    <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">Choose a Kit</div>
-                    <div>Coming soon...</div>
-                </div>
-            </div>
         </motion.div>
         
     </div>

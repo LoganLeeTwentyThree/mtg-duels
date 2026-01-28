@@ -16,7 +16,6 @@ type GameState = {
   playerNames: Array<string>,
   toast?: string,
   winner? : -1 | 0 | 1
-  format: string
 }
 
 export default function Game(props: {lobbyCode : string, name: string}) {
@@ -30,7 +29,6 @@ export default function Game(props: {lobbyCode : string, name: string}) {
       activePlayer: 0, 
       lastGuessTimeStamp: null,
       playerNames: [],
-      format: ""
     }
   )
 
@@ -72,7 +70,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
       refGameState.current.guessedCards.push(data.card)
     }else if (data.command === "settings")
     {
-      return (<Matchsettings onClick={(e) => sendMessage(JSON.stringify({command: "settings", format: e}))}/>)
+      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(e) => sendMessage(JSON.stringify({command: "settings", format: e}))}/>)
     }
     
   }else 
@@ -81,15 +79,6 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   }
   
   const gameState : GameState | null = refGameState.current
-
-  if(gameState.format == "")
-  {
-    return (
-      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
-        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Waiting for host to select format...</div>
-      </div>
-    )
-  }
   
   if(gameState?.lastGuessTimeStamp != null)
   {
