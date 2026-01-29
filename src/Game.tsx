@@ -106,7 +106,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
             </div>
             {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
-                  sendMessage(JSON.stringify({command: "over"}))
+                sendMessage(JSON.stringify({command: "over"}))
               }}/>
               }
             <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>

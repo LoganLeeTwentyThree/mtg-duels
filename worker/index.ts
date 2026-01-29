@@ -176,6 +176,8 @@ export class MyDurableObject extends DurableObject<Env> {
       {
         const newGame: GameState = {
           ...this.currentGameState,
+          winner: -1,
+          guessedCards: [],
           activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
           players: this.currentGameState.players.map(p => ({
             ...p,
@@ -204,8 +206,6 @@ export class MyDurableObject extends DurableObject<Env> {
           format: messageObj.format
         })
       }
-
-      console.log(this.currentGameState.players)
       this.currentGameState.players[id].kit = messageObj.kit
       this.updateGameState(false, {}) //serialize kit
 
