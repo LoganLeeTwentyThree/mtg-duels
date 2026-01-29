@@ -174,12 +174,18 @@ export class MyDurableObject extends DurableObject<Env> {
       this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
-        let newGame = new GameState()
-        newGame.activePlayer = (this.currentGameState.activePlayer ^ 1) as 0 | 1
+        const newGame: GameState = {
+          ...this.currentGameState,
+          activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
+          players: this.currentGameState.players.map(p => ({
+            ...p,
+            points: 0,
+          })),
+        }
+
         this.updateGameState(false, newGame)
         await this.addRandomCard()
         this.initializeClientState()
-        
       }
     }else if (messageObj.command === "over")
     {
@@ -199,6 +205,7 @@ export class MyDurableObject extends DurableObject<Env> {
         })
       }
 
+      console.log(this.currentGameState.players)
       this.currentGameState.players[id].kit = messageObj.kit
       this.updateGameState(false, {}) //serialize kit
 

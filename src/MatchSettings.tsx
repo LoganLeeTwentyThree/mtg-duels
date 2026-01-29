@@ -12,6 +12,7 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
   const [submitted, setSubmitted] = useState<boolean>(false)
 
   const [kit, setKit] = useState<string>("Creatures")
+  console.log(format)
 
   
 
