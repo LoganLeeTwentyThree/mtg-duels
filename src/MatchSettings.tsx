@@ -1,9 +1,9 @@
 import { useState } from "react"
 import * as Scry from "scryfall-sdk";
-import { Kit, NAME_TO_KIT }  from "./../types" 
+import { ALL_KITS, CREATURES, Kit }  from "./../types" 
 
 type MatchSettingsProps = {
-  onClick: (format: string, kit: string) => void
+  onClick: (format: string, kit: Kit) => void
   selectFormat: boolean
 }
 
@@ -11,10 +11,7 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
   const [format, setFormat] = useState<string>("standard")
   const [submitted, setSubmitted] = useState<boolean>(false)
 
-  const [kit, setKit] = useState<string>("Creatures")
-  console.log(format)
-
-  
+  const [kit, setKit] = useState<Kit>(CREATURES)
 
   const formats = Object.keys(Scry.Format).filter(
     key => Number.isNaN(Number(key)) // get rid of format ids
@@ -51,11 +48,11 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
             <div className="bg-white p-1 m-1">Win Condition</div>
             <select
                 className="w-50 bg-white"
-                onChange={(e) => setKit(e.target.value)}
+                defaultValue={""}
                 >
-                {[...NAME_TO_KIT.keys()].map(e => (
-                    <option key={e} value={e}>
-                        {e}
+                {ALL_KITS.map(e => (
+                    <option key={e.name} value={e.name} onClick={() => setKit(e)}>
+                        {e.name}
                     </option>
                     ))}
             </select>

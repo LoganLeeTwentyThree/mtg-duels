@@ -1,17 +1,18 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Scry from "scryfall-sdk";
-import { NAME_TO_KIT, GameState } from "./../types"
-import type { Player } from "./../types";
+import { GameState, ClientCommand, ServerCommand, CREATURES, ALL_KITS } from "./../types"
+import type {Kit, Item} from "./../types"
 
 export class MyDurableObject extends DurableObject<Env> {
   currentGameState : GameState =  new GameState()
   sessions : Map<WebSocket, number> = new Map()
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     Scry.setAgent("mtg-duels", "1.0.0")
     const oldState : GameState | null | undefined = this.ctx.storage.kv.get("gamestate")
     //if there is existing state and one or more existing websocket connections
-    if(oldState != null && oldState != undefined && this.ctx.getWebSockets().length > 0)
+    if(oldState && this.ctx.getWebSockets().length > 0)
     {
       this.currentGameState = oldState
       
@@ -22,18 +23,16 @@ export class MyDurableObject extends DurableObject<Env> {
     }
   }
 
+  
+
   async addRandomCard()
   {
-    try{
-        const random = await Scry.Cards.random(`format:${this.currentGameState.format} -type:land`)
-        if(random != undefined)
-        {
-          this.updateGameState(true,{
-            guessedCards: [...this.currentGameState.guessedCards, random],
-          })
-        }
-    }catch (caught){
-      console.log(caught)
+    const random = await Scry.Cards.random(`format:${this.currentGameState.format} -type:land`)
+    if(random != undefined)
+    {
+      this.updateGameState(true,{
+        guessedCards: [...this.currentGameState.guessedCards, random],
+      })
     }
   } 
 
@@ -53,7 +52,7 @@ export class MyDurableObject extends DurableObject<Env> {
     // save id for persistence between hibernations
     const id = await this.getPlayers()
     
-    this.currentGameState.players.push({name: url.searchParams.get("name") ?? "No Name Nelly", kit: "None", points: 0})
+    this.currentGameState.players.push({name: url.searchParams.get("name") ?? "No Name Nelly", kitId: -1, points: 0})
     this.sessions.set(server, id)
     server.serializeAttachment(id)
 
@@ -70,7 +69,8 @@ export class MyDurableObject extends DurableObject<Env> {
 
   isLegalPlay(guess : Scry.Card) : boolean 
   {
-    if(guess.type_line.includes("Land"))
+    //need to address pathways
+    if(guess.type_line.includes("Land") && !guess.card_faces)
     {
       return false
     }
@@ -120,58 +120,55 @@ export class MyDurableObject extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
     let messageObj = JSON.parse(message as string)
-    const id = this.sessions.get(ws)
 
-    //if its a guess from the active player, and there are two players, and the time hasnt run out
-    if( messageObj.command === "guess" && id == this.currentGameState.activePlayer && (await this.getPlayers()) == 2 && (!this.currentGameState.lastGuessTimeStamp || new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp!.getSeconds() < 20 ))
-    {      
-      try{
-        
-        const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${this.currentGameState.format}`).all()
-        const guessedCard : Scry.Card | void = ((await result.next()).value)
-        
-        
-        if(guessedCard == null || guessedCard == undefined)
-        {
-          this.updateGameState(true,{toast: "Invalid card"})
-          return
-        }
-        
-        if(this.isLegalPlay(guessedCard!))
-        {
-          this.updateGameState(true,
-            {
-              players: this.currentGameState.players.map((e, i) => {
-                if( i == id)
-                {
-                  return {
-                    name: e.name,
-                    kit: e.kit,
-                    points: e.points + ((NAME_TO_KIT.get(e.kit) ?? NAME_TO_KIT.get("Creatures")!).isWin(guessedCard) ? 1 : 0)
-                  }
-                }else {
-                  return e
-                }
-              }), //important that players stay at same index
-              guessedCards: [...this.currentGameState.guessedCards, guessedCard],
-              lastGuessTimeStamp: new Date(),
-              activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
-              toast: ""
-            })
-        }else
-        {
-          this.updateGameState(true, {toast: `Invalid guess: ${guessedCard!.name}`})
-        }
-      }catch (e)
-      {
-        console.log(e)
-      }
-    }else if (messageObj.command === "poll")
+    switch (messageObj.command as ClientCommand) {
+      case ClientCommand.guess: this.handleGuess(ws, message); break;
+      case ClientCommand.poll: this.handlePoll(ws, message); break;
+      case ClientCommand.rematch: this.handleRematch(ws, message); break;
+      case ClientCommand.end: this.handleOver(ws, message); break;
+      case ClientCommand.settings: this.handleSettings(ws, message); break;
+    }
+  }
+
+  handlePoll(ws : WebSocket, message: ArrayBuffer | string)
+  {
+    ws.send(JSON.stringify({command: ServerCommand.settings, playerIndex: this.sessions.get(ws)}))
+  }
+
+  handleSettings(ws : WebSocket, message: ArrayBuffer | string)
+  {
+    const messageObj = JSON.parse(message as string)
+    const id = this.sessions.get(ws)!
+    if(id == 0)//only the host can choose the format
     {
-      ws.send(JSON.stringify({command: "settings", playerIndex: this.sessions.get(ws)}))
-    }else if( messageObj.command === "rematch")
+      this.updateGameState(false, {
+        format: messageObj.format
+      })
+    }
+
+    
+    this.currentGameState.players[id].kitId = messageObj.kitId
+    this.updateGameState(false, {}) //serialize kit
+
+    if(this.currentGameState.players[id ^ 1].kitId > -1)
     {
-      this.currentGameState.rematch[this.sessions.get(ws)!] = true
+      this.addRandomCard() //random card must be added after the format is chosen
+      this.initializeClientState()
+    }
+  }
+
+  handleOver(ws : WebSocket, message: ArrayBuffer | string)
+  {
+    //sometimes this doesnt work ?
+    if(this.currentGameState.lastGuessTimeStamp && new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp?.getSeconds() >= 20 && this.currentGameState.winner == -1)
+    {
+      this.updateGameState(true, {winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
+    }
+  }
+
+  async handleRematch(ws : WebSocket, message: ArrayBuffer | string)
+  {
+    this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
         const newGame: GameState = {
@@ -190,42 +187,69 @@ export class MyDurableObject extends DurableObject<Env> {
         await this.addRandomCard()
         this.initializeClientState()
       }
-    }else if (messageObj.command === "over")
-    {
-      //sometimes this doesnt work ?
-      if(this.currentGameState.lastGuessTimeStamp && new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp?.getSeconds() >= 20 && this.currentGameState.winner == -1)
-      {
-        this.updateGameState(true, {winner: (this.currentGameState.activePlayer ^ 1) as -1 | 0 | 1})
-      }
-    }else if( messageObj.command === "settings")
-    {
-
-      let id = this.sessions.get(ws)!
-      if(id == 0)//only the host can choose the format
-      {
-        this.updateGameState(false, {
-          format: messageObj.format
-        })
-      }
-      this.currentGameState.players[id].kit = messageObj.kit
-      this.updateGameState(false, {}) //serialize kit
-
-      if(this.currentGameState.players[id ^ 1].kit !== "None")
-      {
-        this.addRandomCard() //random card must be added after the format is chosen
-        this.initializeClientState()
-      }
-        
-    
-    }
   }
+  
+
+  async handleGuess(ws : WebSocket, message: ArrayBuffer | string)
+  {
+    let messageObj = JSON.parse(message as string)
+    try{
+        
+        const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${this.currentGameState.format}`).all()
+        const guessedCard : Scry.Card | void = ((await result.next()).value)
+        
+        
+        if(guessedCard == null || guessedCard == undefined)
+        {
+          this.updateGameState(true,{toast: "Invalid card"})
+          return
+        }
+
+        const id = this.sessions.get(ws)
+        
+        if(this.isLegalPlay(guessedCard!))
+        {
+          const player = this.currentGameState.players[id!]
+          const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
+          const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
+          this.updateGameState(true,
+            {
+              players: this.currentGameState.players.map((e, i) => {
+                if( i == id )
+                {
+                  return {
+                    name: e.name,
+                    kitId: e.kitId,
+                    points: newPoints
+                  }
+                }else {
+                  return e
+                }
+              }), //important that players stay at same index
+              guessedCards: [...this.currentGameState.guessedCards, guessedCard],
+              lastGuessTimeStamp: new Date(),
+              activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
+              toast: "",
+              winner: isOver ? (id ?? -1) as -1 | 0 | 1 : -1
+            })
+        }else
+        {
+          this.updateGameState(true, {toast: `Invalid guess: ${guessedCard!.name}`})
+        }
+      }catch (e)
+      {
+        console.log(e)
+      }
+  }
+
+
 
   initializeClientState()
   {
     for( const ws of this.ctx.getWebSockets())
       {      
         ws.send(
-          JSON.stringify({command: "update", gameState: {...this.currentGameState}, playerIndex: this.sessions.get(ws)}),
+          JSON.stringify({command: ServerCommand.update, gameState: {...this.currentGameState}, playerIndex: this.sessions.get(ws)}),
         );
       }
   }
@@ -241,7 +265,7 @@ export class MyDurableObject extends DurableObject<Env> {
       for( const ws of this.ctx.getWebSockets())
       {      
         ws.send(
-          JSON.stringify({command: "update", gameState: {...newState }, playerIndex: this.sessions.get(ws)}),
+          JSON.stringify({command: ServerCommand.update, gameState: {...newState }, playerIndex: this.sessions.get(ws)}),
         );
       }
     }

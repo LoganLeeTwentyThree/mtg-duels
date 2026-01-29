@@ -5,30 +5,39 @@ import { useRef, useState } from "react";
 import { motion } from "motion/react"
 import Search from "./Search";
 import Matchsettings from "./MatchSettings"
-import { GameState, NAME_TO_KIT, Player } from "./../types"
+import { GameState, ClientCommand, ServerCommand, ALL_KITS } from "./../types"
 
 
 export default function Game(props: {lobbyCode : string, name: string}) {
 
   const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
 
-  let refGameState = useRef<GameState>( new GameState() )
-  let refPlayerIndex = useRef<number>(-1)
+  const refGameState = useRef<GameState>( new GameState() )
+  const refPlayerIndex = useRef<number>(-1)
 
-  const connectionStatus = {
-    [ReadyState.CONNECTING]: 'Connecting',
-    [ReadyState.OPEN]: 'Open',
-    [ReadyState.CLOSING]: 'Closing',
-    [ReadyState.CLOSED]: 'Closed',
-    [ReadyState.UNINSTANTIATED]: 'Uninstantiated',
-  }[readyState];
-
-  if(connectionStatus === 'Closed')
+  //opponent leaves after establishing a connection
+  if(readyState === ReadyState.CLOSED && refPlayerIndex.current > -1)
   {
-    window.location.reload()
+    return (
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Opponent Disconnected</div>
+        <button className='bg-white p-2 m-2' onClick={() => window.location.reload()}>Leave</button>
+      </div>
+    )
+  }
+
+  //Connection never established
+  if(readyState === ReadyState.CLOSED)
+  {
+    return (
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Lobby is full!</div>
+        <button className='bg-white p-2 m-2' onClick={() => window.location.reload()}>Leave</button>
+      </div>
+    )
   }
   
-  if (connectionStatus === 'Connecting')
+  if (readyState === ReadyState.CONNECTING)
   {
     return (
       <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
@@ -37,51 +46,53 @@ export default function Game(props: {lobbyCode : string, name: string}) {
     )
   }
 
-  
-  let timeRemaining = null
-  if(lastMessage != null)
+  //first render - no message has been sent 
+  if(!lastMessage)
   {
-    const data = JSON.parse(lastMessage?.data)
-    console.log(data)
-    if(data.command === "update")
-    {
-      const updatedState : Partial<GameState> = JSON.parse(lastMessage?.data).gameState
+    sendMessage(JSON.stringify({command: ClientCommand.poll}))
+    return (
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Connecting...</div>
+      </div>
+    )
+  }
+
+  const data = JSON.parse(lastMessage?.data)
+  console.log(data)
+
+  switch (data.command)
+  {
+    case ServerCommand.update:
+      const updatedState : Partial<GameState> = data.gameState
       Object.assign(refGameState.current, updatedState) 
-    }else if (data.command === "push")
-    {
+      break;
+    case ServerCommand.push:
       //this doesnt work yet
       refGameState.current.guessedCards.push(data.card)
-    }else if (data.command === "settings")
-    {
+      break;
+    case ServerCommand.settings:
       refPlayerIndex.current = data.playerIndex;
-      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit) => sendMessage(JSON.stringify({command: "settings", format: format, kit: kit}))}/>)
-    }
-    
-  }else 
-  {
-    sendMessage(JSON.stringify({command: "poll"}))
+      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id}))}/>)
+    default:
+      return (<div>Server Error</div>)
   }
+
+  const gameState = refGameState.current
+  let timeRemaining = null
   
-  const gameState : GameState | null = refGameState.current
-  
-  if(gameState?.lastGuessTimeStamp != null)
+  if(gameState.lastGuessTimeStamp)
   {
-    timeRemaining = new Date(gameState!.lastGuessTimeStamp)
+    timeRemaining = new Date(gameState.lastGuessTimeStamp)
     timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
   }
 
-  let myBG
-  let theirBG
-  if(gameState?.activePlayer == refPlayerIndex.current)
-  {
-    myBG = "bg-green-100"
-    theirBG = "bg-gray-100" 
-  }else
-  {
-    myBG = "bg-gray-100"
-    theirBG = "bg-green-100" 
-  }
 
+  const isMyTurn = gameState.activePlayer === refPlayerIndex.current
+  const myBG = isMyTurn ? "bg-green-100" : "bg-gray-100"
+  const theirBG = isMyTurn ? "bg-gray-100" : "bg-green-100"
+
+  const myKit = ALL_KITS[gameState.players[refPlayerIndex.current].kitId]
+  const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId]
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center bg-gray-700">
@@ -91,7 +102,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
           {gameState.winner! == refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
           {gameState.winner! != refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
           <button onClick={() => {
-              sendMessage(JSON.stringify({command:"rematch"}))
+              sendMessage(JSON.stringify({command: ClientCommand.rematch}))
             }} 
             className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
           <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
@@ -101,23 +112,23 @@ export default function Game(props: {lobbyCode : string, name: string}) {
           <div id="playerContainer" className="flex flex-row justify-between w-full">
             <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
               <div>{props.name}</div>
-              <div>{gameState.players[refPlayerIndex.current]?.kit}</div>
-              <div>{gameState.players[refPlayerIndex.current]?.points} / {NAME_TO_KIT.get(gameState.players[refPlayerIndex.current]?.kit)?.points ?? 10}</div>
+              <div>{myKit.name}</div>
+              <div>{gameState.players[refPlayerIndex.current]?.points} / {myKit.points ?? 10}</div>
             </div>
-            {timeRemaining != null && <Timer key={timeRemaining!.getSeconds()} expiryTimeStamp={timeRemaining!} onExpire={() => 
+            {timeRemaining != null && gameState.winner! == -1 && <Timer key={timeRemaining.getTime()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
-                sendMessage(JSON.stringify({command: "over"}))
+                sendMessage(JSON.stringify({command: ClientCommand.end}))
               }}/>
               }
             <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
               <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
-              <div>{gameState.players[refPlayerIndex.current ^ 1]?.kit}</div>
-              <div>{gameState.players[refPlayerIndex.current ^ 1]?.points} / {NAME_TO_KIT.get(gameState.players[refPlayerIndex.current ^ 1]?.kit)?.points ?? 10}</div>
+              <div>{theirKit.name}</div>
+              <div>{theirKit.points} / {theirKit.points ?? 10}</div>
             </div>
           </div>
           
           <Search onClick={(e) => {
-            sendMessage(JSON.stringify({command:"guess", card: e}))
+            sendMessage(JSON.stringify({command: ClientCommand.guess, card: e}))
           }}/>
 
           <div id="chainContainer" className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
