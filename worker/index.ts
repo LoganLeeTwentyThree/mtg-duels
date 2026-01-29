@@ -178,6 +178,7 @@ export class MyDurableObject extends DurableObject<Env> {
           ...this.currentGameState,
           winner: -1,
           guessedCards: [],
+          rematch: [false, false],
           activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
           players: this.currentGameState.players.map(p => ({
             ...p,
