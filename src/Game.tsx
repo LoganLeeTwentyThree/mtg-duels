@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { motion } from "motion/react"
 import Search from "./Search";
 import Matchsettings from "./MatchSettings"
-import { GameState, ClientCommand, ServerCommand, ALL_KITS } from "./../types"
+import { GameState, ClientCommand, ServerCommand, ALL_KITS, ALL_ITEMS } from "./../types"
 
 
 export default function Game(props: {lobbyCode : string, name: string}) {
@@ -20,7 +20,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   {
     return (
       <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
-        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Opponent Disconnected</div>
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Opponent Disconnected</div>
         <button className='bg-white p-2 m-2' onClick={() => window.location.reload()}>Leave</button>
       </div>
     )
@@ -30,8 +30,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if(readyState === ReadyState.CLOSED)
   {
     return (
-      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
-        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Lobby is full!</div>
+      <div className="flex flex-col items-center w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Lobby is full!</div>
         <button className='bg-white p-2 m-2' onClick={() => window.location.reload()}>Leave</button>
       </div>
     )
@@ -40,8 +40,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if (readyState === ReadyState.CONNECTING)
   {
     return (
-      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
-        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Connecting...</div>
+      <div className="flex flex-col items-center w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Connecting...</div>
       </div>
     )
   }
@@ -51,8 +51,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   {
     sendMessage(JSON.stringify({command: ClientCommand.poll}))
     return (
-      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
-        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-5xl p-5">Connecting...</div>
+      <div className="flex flex-col items-center w-screen bg-black justify-center">
+        <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Connecting...</div>
       </div>
     )
   }
@@ -72,7 +72,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
       break;
     case ServerCommand.settings:
       refPlayerIndex.current = data.playerIndex;
-      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id}))}/>)
+      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
     default:
       return (<div>Server Error</div>)
   }
@@ -95,7 +95,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId]
 
   return (
-    <div className="w-full min-h-screen flex flex-col items-center bg-gray-700">
+    <div className="w-full min-h-dvh flex flex-col items-center bg-gray-700">
       <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
       <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
         {gameState.winner! > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
@@ -108,24 +108,51 @@ export default function Game(props: {lobbyCode : string, name: string}) {
           <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
         </motion.div>}
         <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
+          
           {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
-          <div id="playerContainer" className="flex flex-row justify-between w-full">
-            <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
-              <div>{props.name}</div>
-              <div>{myKit.name}</div>
-              <div>{gameState.players[refPlayerIndex.current]?.points} / {myKit.points ?? 10}</div>
+          
+          {/* PLAYER CONTAINER*/}
+          <div className="flex flex-row justify-between w-full">
+
+            <div className='grid grid-rows-2'>
+              <div>
+                {gameState.players[refPlayerIndex.current].itemIds.map((e) => 
+                  <button 
+                    key={e} 
+                    className='bg-white w-20 h-10 mr-2 hover:bg-yellow-300 hover:scale-105'
+                    onClick={() => sendMessage(JSON.stringify({command: ClientCommand.use, id: e}))}>
+                      {ALL_ITEMS[e].name}</button>
+                )}
+              </div>
+              <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
+                <div>{props.name}</div>
+                <div>{myKit.name}</div>
+                <div>{gameState.players[refPlayerIndex.current]?.points} / {myKit.points ?? 10}</div>
+              </div>
+
             </div>
+            
+            {/* TIMER */}
             {timeRemaining != null && gameState.winner! == -1 && <Timer key={timeRemaining.getTime()} expiryTimeStamp={timeRemaining!} onExpire={() => 
               {
                 sendMessage(JSON.stringify({command: ClientCommand.end}))
               }}/>
               }
+
+          <div className='grid grid-rows-2'>
+            <div>
+              {gameState.players[refPlayerIndex.current ^ 1].itemIds.map((e) => 
+                <div key={e} className='bg-white w-20 h-10 mr-2 hover:bg-yellow-300 hover:scale-105'>{ALL_ITEMS[e].name}</div>
+              )}
+            </div>
             <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
               <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
               <div>{theirKit.name}</div>
               <div>{theirKit.points} / {theirKit.points ?? 10}</div>
             </div>
           </div>
+
+        </div>
           
           <Search onClick={(e) => {
             sendMessage(JSON.stringify({command: ClientCommand.guess, card: e}))
