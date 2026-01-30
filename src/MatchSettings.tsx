@@ -18,6 +18,8 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
     key => Number.isNaN(Number(key)) // get rid of format ids
   )
 
+  console.log(kit)
+
   return (
     <div className="w-full min-h-screen flex flex-col items-center justify-center bg-black">
         <div className="flex gap-5">
@@ -49,10 +51,10 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
             <div className="bg-white p-1 m-1">Win Condition</div>
             <select
                 className="w-50 m-2 bg-white"
-                defaultValue={""}
+                onChange={(e) => setKit(ALL_KITS[Number(e.target.value)])}
                 >
                 {ALL_KITS.map(e => (
-                    <option key={e.name} value={e.name} onClick={() => setKit(e)}>
+                    <option key={e.id} value={e.id}>
                         {e.name}
                     </option>
                     ))}
@@ -60,10 +62,10 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
             <div className="bg-white p-1 m-1">Items</div>
             <select
                 className="w-50 m-2 bg-white"
-                defaultValue={""}
+                onChange={(e) => setItems([ALL_ITEMS[Number(e.target.value)]])}
                 >
                 {ALL_ITEMS.map(e => (
-                    <option key={e.name} value={e.name} onClick={() => setItems([e])}>
+                    <option key={e.name} value={e.id}>
                         {e.name}
                     </option>
                     ))}

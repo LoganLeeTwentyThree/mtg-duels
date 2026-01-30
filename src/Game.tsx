@@ -165,7 +165,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
             sendMessage(JSON.stringify({command: ClientCommand.guess, card: e}))
           }}/>
 
-          <div id="chainContainer" className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
+          {/* CARD VIEW */}
+          <div className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
             {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
               (
                 <div className="flex flex-col items-center justify-center h-fit" key={e.name}>

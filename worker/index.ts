@@ -139,6 +139,8 @@ export class MyDurableObject extends DurableObject<Env> {
   async handleUse(ws : WebSocket, messageObj : any)
   {
     const id = this.sessions.get(ws)
+
+    
     
     if(id != this.currentGameState.activePlayer)
     {
@@ -151,10 +153,12 @@ export class MyDurableObject extends DurableObject<Env> {
       
       return;
     }
-
+    
     this.currentGameState.players[id].itemIdUses[itemId][1] -= 1
+    console.log("hello")
     const newGameState = await ALL_ITEMS[itemId].use(this.currentGameState)
     this.updateGameState(true, newGameState)
+    
   }
 
   handlePoll(ws : WebSocket)
@@ -174,6 +178,7 @@ export class MyDurableObject extends DurableObject<Env> {
 
     this.currentGameState.players[id].itemIdUses = messageObj.itemIds.map((e : number) => [e, 1])
     this.currentGameState.players[id].kitId = messageObj.kitId
+    console.log(this.currentGameState.players[id].kitId)
     this.updateGameState(false, {}) //serialize kit
 
     if(this.currentGameState.players[id ^ 1].kitId > -1)
@@ -195,44 +200,48 @@ export class MyDurableObject extends DurableObject<Env> {
   async handleRematch(ws : WebSocket)
   {
     this.currentGameState.rematch[this.sessions.get(ws)!] = true
-      if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
-      {
-        const newGame: GameState = {
-          ...this.currentGameState,
-          lastGuessTimeStamp: null,
-          winner: -1,
-          guessedCards: [],
-          rematch: [false, false],
-          activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
-          players: this.currentGameState.players.map(p => ({
-            ...p,
-            points: 0,
-          })),
-          pushCard: this.currentGameState.pushCard
-        }
-
-        this.updateGameState(false, newGame)
-        await this.addRandomCard()
-        this.initializeClientState()
+    if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
+    {
+      const newGame: GameState = {
+        ...this.currentGameState,
+        lastGuessTimeStamp: null,
+        winner: -1,
+        guessedCards: [],
+        rematch: [false, false],
+        activePlayer: (this.currentGameState.activePlayer ^ 1) as 0 | 1,
+        players: this.currentGameState.players.map(p => ({
+          ...p,
+          itemIdUses: [[p.itemIdUses[0][0], 1]],
+          points: 0,
+        })),
+        pushCard: this.currentGameState.pushCard
       }
+
+      this.updateGameState(false, newGame)
+      await this.addRandomCard()
+      this.initializeClientState()
+    }
   }
   
 
   async handleGuess(ws : WebSocket, messageObj: any)
   {
+    const id = this.sessions.get(ws)
+    if(this.currentGameState.activePlayer != id)
+    {
+      return
+    }
+
     try{
         
         const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${this.currentGameState.format}`).all()
         const guessedCard : Scry.Card | void = ((await result.next()).value)
         
-        
-        if(guessedCard == null || guessedCard == undefined)
+        if(!guessedCard)
         {
           this.updateGameState(true,{toast: "Invalid card"})
           return
         }
-
-        const id = this.sessions.get(ws)
         
         if(this.isLegalPlay(guessedCard!))
         {
