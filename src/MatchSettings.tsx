@@ -1,9 +1,9 @@
 import { useState } from "react"
 import * as Scry from "scryfall-sdk";
-import { ALL_KITS, CREATURES, Kit }  from "./../types" 
+import { ALL_ITEMS, ALL_KITS, CREATURES, ESCAPE, Item, Kit }  from "./../types" 
 
 type MatchSettingsProps = {
-  onClick: (format: string, kit: Kit) => void
+  onClick: (format: string, kit: Kit, items: Array<Item>) => void
   selectFormat: boolean
 }
 
@@ -12,6 +12,7 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
   const [submitted, setSubmitted] = useState<boolean>(false)
 
   const [kit, setKit] = useState<Kit>(CREATURES)
+  const [items, setItems] = useState<Array<Item>>([ESCAPE])
 
   const formats = Object.keys(Scry.Format).filter(
     key => Number.isNaN(Number(key)) // get rid of format ids
@@ -47,11 +48,22 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
             </div>
             <div className="bg-white p-1 m-1">Win Condition</div>
             <select
-                className="w-50 bg-white"
+                className="w-50 m-2 bg-white"
                 defaultValue={""}
                 >
                 {ALL_KITS.map(e => (
                     <option key={e.name} value={e.name} onClick={() => setKit(e)}>
+                        {e.name}
+                    </option>
+                    ))}
+            </select>
+            <div className="bg-white p-1 m-1">Items</div>
+            <select
+                className="w-50 m-2 bg-white"
+                defaultValue={""}
+                >
+                {ALL_ITEMS.map(e => (
+                    <option key={e.name} value={e.name} onClick={() => setItems([e])}>
                         {e.name}
                     </option>
                     ))}
@@ -63,7 +75,7 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
     {!submitted && 
         <button
             onClick={() => {
-                onClick(format, kit)
+                onClick(format, kit, items)
                 setSubmitted(true)
             }}
             className="bg-white w-50 m-5 hover:bg-gray-300 hover:scale-105"

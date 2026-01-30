@@ -5,7 +5,8 @@ export enum ClientCommand {
   settings = "settings",
   guess = "guess",
   end = "end",
-  rematch = "rematch"
+  rematch = "rematch",
+  use = "use"
 }
 
 export enum ServerCommand {
@@ -18,6 +19,7 @@ export type Player = {
   name : string,
   kitId : number,
   points: number,
+  itemIdUses: Array<Array<number>>
 }
 
 export class GameState {
@@ -29,20 +31,19 @@ export class GameState {
   toast?: string = ""
   format: keyof Scry.Legalities | "" = ""
   winner: -1 | 0 | 1 = -1
+
+  pushCard(card : Scry.Card) {
+    this.guessedCards.push(card)
+    this.activePlayer = (this.activePlayer ^ 1) as 0 | 1
+    this.lastGuessTimeStamp = new Date()
+  }
 }
 
 export interface Kit {
-
     name: string,
     isWin(card: Scry.Card, format?: keyof Scry.Legalities): boolean,
-    points: number,
-    id: number
-}
-
-export interface Item {
-  name: string,
-  use(): void,
-  uses: number,
+    readonly points: number,
+    readonly id: number
 }
 
 export const CREATURES : Kit = {
@@ -99,3 +100,23 @@ export const BANNED_AND_RESTRICTED : Kit = {
 export const REPRINTS : Kit = {name: "Reprints", isWin: card => card.reprint, points: 3, id: 7}
 
 export const ALL_KITS : Array<Kit> = [CREATURES, INSTANTS, SORCERIES, ENCHANTMENTS, ARTIFACTS, PLANESWALKERS, BANNED_AND_RESTRICTED, REPRINTS]
+
+export interface Item {
+  name: string,
+  use(oldState: GameState): Promise<Partial<GameState>>,
+  readonly maxUses: number,
+  readonly id: number
+}
+
+export const ESCAPE : Item = {
+  name: "Escape",
+  use: async (oldState : GameState) => {
+    const random = await Scry.Cards.random(`format:${oldState.format} -type:land`)
+    oldState.pushCard(random)
+    return oldState
+  },
+  maxUses: 1,
+  id: 0
+}
+
+export const ALL_ITEMS : Array<Item> = [ESCAPE]

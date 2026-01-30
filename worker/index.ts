@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import * as Scry from "scryfall-sdk";
-import { GameState, ClientCommand, ServerCommand, CREATURES, ALL_KITS } from "./../types"
+import { GameState, ClientCommand, ServerCommand, CREATURES, ALL_KITS, ALL_ITEMS } from "./../types"
 import type {Kit, Item} from "./../types"
 
 export class MyDurableObject extends DurableObject<Env> {
@@ -52,7 +52,12 @@ export class MyDurableObject extends DurableObject<Env> {
     // save id for persistence between hibernations
     const id = await this.getPlayers()
     
-    this.currentGameState.players.push({name: url.searchParams.get("name") ?? "No Name Nelly", kitId: -1, points: 0})
+    this.currentGameState.players.push({
+      name: url.searchParams.get("name")?.substring(0,20) ?? "No Name Nelly", 
+      kitId: -1, 
+      points: 0,
+      itemIdUses: [],
+    })
     this.sessions.set(server, id)
     server.serializeAttachment(id)
 
@@ -122,22 +127,43 @@ export class MyDurableObject extends DurableObject<Env> {
     let messageObj = JSON.parse(message as string)
 
     switch (messageObj.command as ClientCommand) {
-      case ClientCommand.guess: this.handleGuess(ws, message); break;
-      case ClientCommand.poll: this.handlePoll(ws, message); break;
-      case ClientCommand.rematch: this.handleRematch(ws, message); break;
-      case ClientCommand.end: this.handleOver(ws, message); break;
-      case ClientCommand.settings: this.handleSettings(ws, message); break;
+      case ClientCommand.guess: this.handleGuess(ws, messageObj); break;
+      case ClientCommand.poll: this.handlePoll(ws); break;
+      case ClientCommand.rematch: this.handleRematch(ws); break;
+      case ClientCommand.end: this.handleOver(); break;
+      case ClientCommand.settings: this.handleSettings(ws, messageObj); break;
+      case ClientCommand.use: this.handleUse(ws, messageObj); break;
     }
   }
 
-  handlePoll(ws : WebSocket, message: ArrayBuffer | string)
+  async handleUse(ws : WebSocket, messageObj : any)
+  {
+    const id = this.sessions.get(ws)
+    
+    if(id != this.currentGameState.activePlayer)
+    {
+      return
+    }
+    
+    const itemId = messageObj.id
+    if (this.currentGameState.players[id].itemIdUses[itemId][1] <= 0)
+    {
+      
+      return;
+    }
+
+    this.currentGameState.players[id].itemIdUses[itemId][1] -= 1
+    const newGameState = await ALL_ITEMS[itemId].use(this.currentGameState)
+    this.updateGameState(true, newGameState)
+  }
+
+  handlePoll(ws : WebSocket)
   {
     ws.send(JSON.stringify({command: ServerCommand.settings, playerIndex: this.sessions.get(ws)}))
   }
 
-  handleSettings(ws : WebSocket, message: ArrayBuffer | string)
+  handleSettings(ws : WebSocket, messageObj : any)
   {
-    const messageObj = JSON.parse(message as string)
     const id = this.sessions.get(ws)!
     if(id == 0)//only the host can choose the format
     {
@@ -146,7 +172,7 @@ export class MyDurableObject extends DurableObject<Env> {
       })
     }
 
-    
+    this.currentGameState.players[id].itemIdUses = messageObj.itemIds.map((e : number) => [e, 1])
     this.currentGameState.players[id].kitId = messageObj.kitId
     this.updateGameState(false, {}) //serialize kit
 
@@ -157,7 +183,7 @@ export class MyDurableObject extends DurableObject<Env> {
     }
   }
 
-  handleOver(ws : WebSocket, message: ArrayBuffer | string)
+  handleOver()
   {
     //sometimes this doesnt work ?
     if(this.currentGameState.lastGuessTimeStamp && new Date().getSeconds() - this.currentGameState.lastGuessTimeStamp?.getSeconds() >= 20 && this.currentGameState.winner == -1)
@@ -166,13 +192,14 @@ export class MyDurableObject extends DurableObject<Env> {
     }
   }
 
-  async handleRematch(ws : WebSocket, message: ArrayBuffer | string)
+  async handleRematch(ws : WebSocket)
   {
     this.currentGameState.rematch[this.sessions.get(ws)!] = true
       if (this.currentGameState.rematch[0] && this.currentGameState.rematch[1])
       {
         const newGame: GameState = {
           ...this.currentGameState,
+          lastGuessTimeStamp: null,
           winner: -1,
           guessedCards: [],
           rematch: [false, false],
@@ -181,6 +208,7 @@ export class MyDurableObject extends DurableObject<Env> {
             ...p,
             points: 0,
           })),
+          pushCard: this.currentGameState.pushCard
         }
 
         this.updateGameState(false, newGame)
@@ -190,9 +218,8 @@ export class MyDurableObject extends DurableObject<Env> {
   }
   
 
-  async handleGuess(ws : WebSocket, message: ArrayBuffer | string)
+  async handleGuess(ws : WebSocket, messageObj: any)
   {
-    let messageObj = JSON.parse(message as string)
     try{
         
         const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${this.currentGameState.format}`).all()
@@ -218,9 +245,8 @@ export class MyDurableObject extends DurableObject<Env> {
                 if( i == id )
                 {
                   return {
-                    name: e.name,
-                    kitId: e.kitId,
-                    points: newPoints
+                    ...e,
+                    points: newPoints,
                   }
                 }else {
                   return e
@@ -290,6 +316,8 @@ export class MyDurableObject extends DurableObject<Env> {
 
 }
 
+
+//worker that handles initial requests
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
