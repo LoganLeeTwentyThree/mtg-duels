@@ -56,7 +56,7 @@ export class MyDurableObject extends DurableObject<Env> {
       name: url.searchParams.get("name")?.substring(0,20) ?? "No Name Nelly", 
       kitId: -1, 
       points: 0,
-      itemIds: []
+      itemIdUses: [],
     })
     this.sessions.set(server, id)
     server.serializeAttachment(id)
@@ -138,11 +138,23 @@ export class MyDurableObject extends DurableObject<Env> {
 
   async handleUse(ws : WebSocket, messageObj : any)
   {
-    if(this.sessions.get(ws) == this.currentGameState.activePlayer)
+    const id = this.sessions.get(ws)
+    
+    if(id != this.currentGameState.activePlayer)
     {
-      const newGameState = await ALL_ITEMS[messageObj.id].use(this.currentGameState)
-      this.updateGameState(true, newGameState)
+      return
     }
+    
+    const itemId = messageObj.id
+    if (this.currentGameState.players[id].itemIdUses[itemId][1] <= 0)
+    {
+      
+      return;
+    }
+
+    this.currentGameState.players[id].itemIdUses[itemId][1] -= 1
+    const newGameState = await ALL_ITEMS[itemId].use(this.currentGameState)
+    this.updateGameState(true, newGameState)
   }
 
   handlePoll(ws : WebSocket)
@@ -160,7 +172,7 @@ export class MyDurableObject extends DurableObject<Env> {
       })
     }
 
-    this.currentGameState.players[id].itemIds = messageObj.itemIds
+    this.currentGameState.players[id].itemIdUses = messageObj.itemIds.map((e : number) => [e, 1])
     this.currentGameState.players[id].kitId = messageObj.kitId
     this.updateGameState(false, {}) //serialize kit
 
@@ -187,6 +199,7 @@ export class MyDurableObject extends DurableObject<Env> {
       {
         const newGame: GameState = {
           ...this.currentGameState,
+          lastGuessTimeStamp: null,
           winner: -1,
           guessedCards: [],
           rematch: [false, false],

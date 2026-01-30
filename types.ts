@@ -19,7 +19,7 @@ export type Player = {
   name : string,
   kitId : number,
   points: number,
-  itemIds: Array<number>
+  itemIdUses: Array<Array<number>>
 }
 
 export class GameState {
@@ -40,11 +40,10 @@ export class GameState {
 }
 
 export interface Kit {
-
     name: string,
     isWin(card: Scry.Card, format?: keyof Scry.Legalities): boolean,
-    points: number,
-    id: number
+    readonly points: number,
+    readonly id: number
 }
 
 export const CREATURES : Kit = {
@@ -105,8 +104,8 @@ export const ALL_KITS : Array<Kit> = [CREATURES, INSTANTS, SORCERIES, ENCHANTMEN
 export interface Item {
   name: string,
   use(oldState: GameState): Promise<Partial<GameState>>,
-  uses: number,
-  id: number
+  readonly maxUses: number,
+  readonly id: number
 }
 
 export const ESCAPE : Item = {
@@ -116,7 +115,7 @@ export const ESCAPE : Item = {
     oldState.pushCard(random)
     return oldState
   },
-  uses: 1,
+  maxUses: 1,
   id: 0
 }
 

@@ -30,7 +30,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if(readyState === ReadyState.CLOSED)
   {
     return (
-      <div className="flex flex-col items-center w-screen bg-black justify-center">
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
         <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Lobby is full!</div>
         <button className='bg-white p-2 m-2' onClick={() => window.location.reload()}>Leave</button>
       </div>
@@ -40,7 +40,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if (readyState === ReadyState.CONNECTING)
   {
     return (
-      <div className="flex flex-col items-center w-screen bg-black justify-center">
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
         <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Connecting...</div>
       </div>
     )
@@ -51,7 +51,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   {
     sendMessage(JSON.stringify({command: ClientCommand.poll}))
     return (
-      <div className="flex flex-col items-center w-screen bg-black justify-center">
+      <div className="flex flex-col items-center h-screen w-screen bg-black justify-center">
         <div className="bg-gray-500 border-2 border-gray-700 text-5xl h-5xl w-2/3 p-5">Connecting...</div>
       </div>
     )
@@ -114,14 +114,17 @@ export default function Game(props: {lobbyCode : string, name: string}) {
           {/* PLAYER CONTAINER*/}
           <div className="flex flex-row justify-between w-full">
 
+            {/* THIS PLAYER */}
             <div className='grid grid-rows-2'>
               <div>
-                {gameState.players[refPlayerIndex.current].itemIds.map((e) => 
-                  <button 
-                    key={e} 
-                    className='bg-white w-20 h-10 mr-2 hover:bg-yellow-300 hover:scale-105'
-                    onClick={() => sendMessage(JSON.stringify({command: ClientCommand.use, id: e}))}>
-                      {ALL_ITEMS[e].name}</button>
+                {gameState.players[refPlayerIndex.current].itemIdUses.map((e) => 
+                  <div 
+                    key={e[0]} 
+                    className='bg-white w-20 h-15 mr-2 hover:bg-yellow-300 hover:scale-105'
+                    onClick={() => sendMessage(JSON.stringify({command: ClientCommand.use, id: e[0]}))}>
+                      <div>{ALL_ITEMS[e[0]].name}</div>
+                      <div>Uses: {e[1]}</div>
+                    </div>
                 )}
               </div>
               <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
@@ -139,16 +142,20 @@ export default function Game(props: {lobbyCode : string, name: string}) {
               }}/>
               }
 
+          {/* OTHER PLAYER */}
           <div className='grid grid-rows-2'>
             <div>
-              {gameState.players[refPlayerIndex.current ^ 1].itemIds.map((e) => 
-                <div key={e} className='bg-white w-20 h-10 mr-2 hover:bg-yellow-300 hover:scale-105'>{ALL_ITEMS[e].name}</div>
+              {gameState.players[refPlayerIndex.current ^ 1].itemIdUses.map((e) => 
+                <div key={e[0]} className='bg-white w-20 h-15 mr-2 hover:bg-yellow-300 hover:scale-105'>
+                  <div>{ALL_ITEMS[e[0]].name}</div>
+                  <div>Uses: {e[1]}</div>
+                </div>
               )}
             </div>
             <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
               <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
               <div>{theirKit.name}</div>
-              <div>{theirKit.points} / {theirKit.points ?? 10}</div>
+              <div>{gameState?.players[refPlayerIndex.current ^ 1]?.points} / {theirKit.points}</div>
             </div>
           </div>
 
