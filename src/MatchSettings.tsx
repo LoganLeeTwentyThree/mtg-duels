@@ -1,6 +1,7 @@
 import { useState } from "react"
 import * as Scry from "scryfall-sdk";
-import { ALL_ITEMS, ALL_KITS, CREATURES, ESCAPE, Item, Kit }  from "./../types" 
+import { ALL_KITS, CREATURES, Kit }  from "../Kits" 
+import { ALL_ITEMS, Item, ESCAPE } from "../Items"
 
 type MatchSettingsProps = {
   onClick: (format: string, kit: Kit, items: Array<Item>) => void
@@ -18,7 +19,6 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
     key => Number.isNaN(Number(key)) // get rid of format ids
   )
 
-  console.log(kit)
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center justify-center bg-black">

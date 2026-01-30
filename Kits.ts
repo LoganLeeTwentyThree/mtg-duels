@@ -1,44 +1,5 @@
 import * as Scry from "scryfall-sdk"
 
-export enum ClientCommand {
-  poll = "poll",
-  settings = "settings",
-  guess = "guess",
-  end = "end",
-  rematch = "rematch",
-  use = "use"
-}
-
-export enum ServerCommand {
-  update = "update", 
-  settings = "settings",
-  push = "push"
-}
-
-export type Player = {
-  name : string,
-  kitId : number,
-  points: number,
-  itemIdUses: Array<Array<number>>
-}
-
-export class GameState {
-  guessedCards: Array<Scry.Card> = []
-  activePlayer: 0 | 1 = 0
-  players: Array<Player> = []
-  lastGuessTimeStamp: Date | null = null
-  rematch: Array<boolean> = [false, false]
-  toast?: string = ""
-  format: keyof Scry.Legalities | "" = ""
-  winner: -1 | 0 | 1 = -1
-
-  pushCard(card : Scry.Card) {
-    this.guessedCards.push(card)
-    this.activePlayer = (this.activePlayer ^ 1) as 0 | 1
-    this.lastGuessTimeStamp = new Date()
-  }
-}
-
 export interface Kit {
     name: string,
     isWin(card: Scry.Card, format?: keyof Scry.Legalities): boolean,
@@ -101,22 +62,3 @@ export const REPRINTS : Kit = {name: "Reprints", isWin: card => card.reprint, po
 
 export const ALL_KITS : Array<Kit> = [CREATURES, INSTANTS, SORCERIES, ENCHANTMENTS, ARTIFACTS, PLANESWALKERS, BANNED_AND_RESTRICTED, REPRINTS]
 
-export interface Item {
-  name: string,
-  use(oldState: GameState): Promise<Partial<GameState>>,
-  readonly maxUses: number,
-  readonly id: number
-}
-
-export const ESCAPE : Item = {
-  name: "Escape",
-  use: async (oldState : GameState) => {
-    const random = await Scry.Cards.random(`format:${oldState.format} -type:land`)
-    oldState.pushCard(random)
-    return oldState
-  },
-  maxUses: 1,
-  id: 0
-}
-
-export const ALL_ITEMS : Array<Item> = [ESCAPE]

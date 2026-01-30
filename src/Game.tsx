@@ -5,7 +5,9 @@ import { useRef, useState } from "react";
 import { motion } from "motion/react"
 import Search from "./Search";
 import Matchsettings from "./MatchSettings"
-import { GameState, ClientCommand, ServerCommand, ALL_KITS, ALL_ITEMS } from "./../types"
+import { GameState, ClientCommand  } from "../Protocol"
+import { ALL_KITS } from "../Kits"
+import { ALL_ITEMS } from '../Items';
 
 
 export default function Game(props: {lobbyCode : string, name: string}) {
@@ -60,21 +62,13 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   const data = JSON.parse(lastMessage?.data)
   console.log(data)
 
-  switch (data.command)
+  const updatedState : Partial<GameState> = data.gameState
+  Object.assign(refGameState.current, updatedState) 
+  refPlayerIndex.current = data.playerIndex; 
+
+  if(data.gameState.phase == 0)
   {
-    case ServerCommand.update:
-      const updatedState : Partial<GameState> = data.gameState
-      Object.assign(refGameState.current, updatedState) 
-      break;
-    case ServerCommand.push:
-      //this doesnt work yet
-      refGameState.current.guessedCards.push(data.card)
-      break;
-    case ServerCommand.settings:
-      refPlayerIndex.current = data.playerIndex;
-      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
-    default:
-      return (<div>Server Error</div>)
+    return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
   }
 
   const gameState = refGameState.current
@@ -91,8 +85,8 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   const myBG = isMyTurn ? "bg-green-100" : "bg-gray-100"
   const theirBG = isMyTurn ? "bg-gray-100" : "bg-green-100"
 
-  const myKit = ALL_KITS[gameState.players[refPlayerIndex.current].kitId]
-  const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId]
+  const myKit = ALL_KITS[gameState.players[refPlayerIndex.current].kitId] ?? 0
+  const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId] ?? 0
 
   return (
     <div className="w-full min-h-dvh flex flex-col items-center bg-gray-700">
@@ -167,7 +161,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
           {/* CARD VIEW */}
           <div className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
-            {gameState != null && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
+            {gameState && gameState.guessedCards.length > 0 && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
               (
                 <div className="flex flex-col items-center justify-center h-fit" key={e.name}>
                   {i != 0 && <motion.div
