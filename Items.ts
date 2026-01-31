@@ -14,6 +14,7 @@ export const ESCAPE : Item = {
     oldState = await GameStateHelpers.pushRandomCard(oldState)
 
     return { 
+        lastGuessTimeStamp: new Date(),
         guessedCards: oldState.guessedCards,
         activePlayer: (oldState.activePlayer ^ 1) as 0 | 1,
         players: oldState.players.map((e, i) => {
@@ -31,4 +32,31 @@ export const ESCAPE : Item = {
   id: 0
 }
 
-export const ALL_ITEMS : Array<Item> = [ESCAPE]
+export const DELAY : Item = {
+    name: "Delay",
+    use: async (oldState : GameState, wsId : number) => {
+        if(!oldState.lastGuessTimeStamp)
+        {
+            return {}
+        }
+        
+        oldState.players[wsId].itemIdUses[0][1] -= 1 //FIX THIS TOO
+        oldState.lastGuessTimeStamp?.setSeconds(oldState.lastGuessTimeStamp.getSeconds() + 5)
+        return { 
+            lastGuessTimeStamp: oldState.lastGuessTimeStamp,
+            players: oldState.players.map((e, i) => {
+                if(i == wsId)
+                {
+                    return {...e, itemIdUses: oldState.players[wsId].itemIdUses} 
+                }else
+                {
+                    return e
+                }
+            })
+        } as Partial<GameState>
+    },
+    maxUses: 2,
+    id: 1
+}
+
+export const ALL_ITEMS : Array<Item> = [ESCAPE, DELAY]

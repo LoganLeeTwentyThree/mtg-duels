@@ -3,6 +3,7 @@ import Timer from "./Timer";
 import * as Scry from "scryfall-sdk";
 import { useRef, useState } from "react";
 import { motion } from "motion/react"
+import CardView from './CardView';
 import Search from "./Search";
 import Matchsettings from "./MatchSettings"
 import { GameState, ClientCommand  } from "../Protocol"
@@ -72,126 +73,118 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   }
 
   const gameState = refGameState.current
-  let timeRemaining = null
-  
-  if(gameState.lastGuessTimeStamp)
+  if(gameState.phase == 1)
   {
-    timeRemaining = new Date(gameState.lastGuessTimeStamp)
-    timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
-  }
+    
+    let timeRemaining = null
+    
+    if(gameState.lastGuessTimeStamp)
+    {
+      timeRemaining = new Date(gameState.lastGuessTimeStamp)
+      timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
+    }
 
 
-  const isMyTurn = gameState.activePlayer === refPlayerIndex.current
-  const myBG = isMyTurn ? "bg-green-100" : "bg-gray-100"
-  const theirBG = isMyTurn ? "bg-gray-100" : "bg-green-100"
+    const isMyTurn = gameState.activePlayer === refPlayerIndex.current
+    const myBG = isMyTurn ? "bg-green-100" : "bg-gray-100"
+    const theirBG = isMyTurn ? "bg-gray-100" : "bg-green-100"
 
-  const myKit = ALL_KITS[gameState.players[refPlayerIndex.current].kitId] ?? 0
-  const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId] ?? 0
+    const myKit = ALL_KITS[gameState.players[refPlayerIndex.current].kitId] ?? 0
+    const theirKit = ALL_KITS[gameState.players[refPlayerIndex.current ^ 1].kitId] ?? 0
 
-  return (
-    <div className="w-full min-h-dvh flex flex-col items-center bg-gray-700">
-      <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode}</div>
-      <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
-        {gameState.winner! > -1 && <motion.div initial={{scale: 0}} animate={{scale:1}} transition={{duration:0.5}} className="absolute flex flex-col items-center h-1/2 w-1/2 bg-gray-500 border-2 border-gray-700 top-1/4 right-1/4 z-50">
-          {gameState.winner! == refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You won :D</div>}
-          {gameState.winner! != refPlayerIndex.current && <div className="bg-gray-700 text-center p-5 z-99 m-2">You lost :(</div>}
-          <button onClick={() => {
-              sendMessage(JSON.stringify({command: ClientCommand.rematch}))
-            }} 
-            className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
-          <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
-        </motion.div>}
-        <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
-          
-          {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
-          
-          {/* PLAYER CONTAINER*/}
-          <div className="flex flex-row justify-between w-full">
-
-            {/* THIS PLAYER */}
-            <div className='grid grid-rows-2'>
-              <div>
-                {gameState.players[refPlayerIndex.current].itemIdUses.map((e) => 
-                  <div 
-                    key={e[0]} 
-                    className='bg-white w-20 h-15 mr-2 hover:bg-yellow-300 hover:scale-105'
-                    onClick={() => sendMessage(JSON.stringify({command: ClientCommand.use, id: e[0]}))}>
-                      <div>{ALL_ITEMS[e[0]].name}</div>
-                      <div>Uses: {e[1]}</div>
-                    </div>
-                )}
-              </div>
-              <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
-                <div>{props.name}</div>
-                <div>{myKit.name}</div>
-                <div>{gameState.players[refPlayerIndex.current]?.points} / {myKit.points ?? 10}</div>
-              </div>
-
-            </div>
+    return (
+      <div className="w-full min-h-dvh flex flex-col items-center bg-gray-700">
+        <div className="w-1/1 h-20 bg-black text-white text-center">mtg-duels - Lobby: {props.lobbyCode} - Format: {gameState.format}</div>
+        <div className="w-5xl h-full flex flex-col items-center bg-black p-5">
+          <div className="flex flex-col size-full text-center p-10 h-full min-w-5xl max-w-7xl">
             
-            {/* TIMER */}
-            {timeRemaining != null && gameState.winner! == -1 && <Timer key={timeRemaining.getTime()} expiryTimeStamp={timeRemaining!} onExpire={() => 
-              {
-                sendMessage(JSON.stringify({command: ClientCommand.end}))
-              }}/>
+            {gameState?.toast && <div className="bg-white">{gameState?.toast}</div>}
+            
+            {/* PLAYER CONTAINER*/}
+            <div className="flex flex-row justify-between w-full">
+
+              {/* THIS PLAYER */}
+              <div className='grid grid-rows-2'>
+                <div>
+                  {gameState.players[refPlayerIndex.current].itemIdUses.map((e) => 
+                    <div 
+                      key={`${e[0]}-${e[1]}`} 
+                      className={(e[1] > 0 ? 'bg-white hover:bg-yellow-300 hover:scale-105' : "bg-gray-500") + " w-20 h-15 mr-2 flex flex-col justify-center"}
+                      onClick={() => sendMessage(JSON.stringify({command: ClientCommand.use, id: e[0]}))}>
+                        <div>{`${ALL_ITEMS[e[0]].name} x ${e[1]}`}</div>
+                      </div>
+                  )}
+                </div>
+                <div className={`justify-self-start ${myBG} h-20 w-80 flex flex-col items-center justify-center`}>
+                  <div>{props.name}</div>
+                  <div>{myKit.name}</div>
+                  <div>{gameState.players[refPlayerIndex.current]?.points} / {myKit.points}</div>
+                </div>
+
+              </div>
+              
+              {/* TIMER */}
+              {timeRemaining != null && gameState.winner! == -1 && <Timer key={timeRemaining.getTime()} expiryTimeStamp={timeRemaining!} onExpire={() => 
+                {
+                  sendMessage(JSON.stringify({command: ClientCommand.end}))
+                }}/>
               }
 
-          {/* OTHER PLAYER */}
-          <div className='grid grid-rows-2'>
-            <div>
-              {gameState.players[refPlayerIndex.current ^ 1].itemIdUses.map((e) => 
-                <div key={e[0]} className='bg-white w-20 h-15 mr-2 hover:bg-yellow-300 hover:scale-105'>
-                  <div>{ALL_ITEMS[e[0]].name}</div>
-                  <div>Uses: {e[1]}</div>
-                </div>
-              )}
+            {/* OTHER PLAYER */}
+            <div className='grid grid-rows-2'>
+              <div>
+                {gameState.players[refPlayerIndex.current ^ 1].itemIdUses.map((e) => 
+                  <div key={`${e[0]}-${e[1]}`}  className={(e[1] > 0 ? 'bg-white' : 'bg-gray-500') + " flex flex-col justify-center w-20 h-15 mr-2"}>
+                    <div>{`${ALL_ITEMS[e[0]].name} x ${e[1]}`}</div>
+                  </div>
+                )}
+              </div>
+              <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
+                <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
+                <div>{theirKit.name}</div>
+                <div>{gameState?.players[refPlayerIndex.current ^ 1]?.points} / {theirKit.points}</div>
+              </div>
             </div>
-            <div className={`justify-self-end ${theirBG} h-20 w-80 flex flex-col items-center justify-center`}>
-              <div>{gameState?.players[refPlayerIndex.current ^ 1]?.name}</div>
-              <div>{theirKit.name}</div>
-              <div>{gameState?.players[refPlayerIndex.current ^ 1]?.points} / {theirKit.points}</div>
-            </div>
-          </div>
 
-        </div>
-          
+          </div>
+            
+          {/* SEARCHBAR */}
           <Search onClick={(e) => {
             sendMessage(JSON.stringify({command: ClientCommand.guess, card: e}))
           }}/>
 
           {/* CARD VIEW */}
-          <div className="p-5 h-full w-full overflow-y-scroll [scrollbar-width:none]">
-            {gameState && gameState.guessedCards.length > 0 && [...gameState.guessedCards].reverse().map((e : Scry.Card, i : number) => 
-              (
-                <div className="flex flex-col items-center justify-center h-fit" key={e.name}>
-                  {i != 0 && <motion.div
-                    key={`${e.name}-connector`}
-                    className="flex flex-col items-center justify-center w-5 bg-pink-200 overflow-x-visible shadow-md shadow-pink-500/100"
-                    initial={ {height: i == 1 ? 0 : 120} }
-                    animate={{ height: i == 1 ? 120 : 120 }}
-                    transition={{ duration: 1 }}
-                  >
-                    {e.cmc === gameState.guessedCards[gameState.guessedCards.length - i]?.cmc && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Cmc - {e.cmc}</div>}
-                    {e.set_id === gameState.guessedCards[gameState.guessedCards.length - i]?.set_id && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Set - {e.set}</div>}
-                    {e.power && e.power === gameState.guessedCards[gameState.guessedCards.length - i]?.power && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Power - {e.power}</div>}
-                    {e.toughness && e.toughness === gameState.guessedCards[gameState.guessedCards.length - i]?.toughness && <div className="w-30 bg-white text-black border-4 border-pink-300 mb-2 shadow-md shadow-pink-500/100">Tougness - {e.toughness}</div>}
-
-                  </motion.div>}
-                  <motion.div
-                    key={`${e.name}-card`} 
-                    className={"flex justify-center items-center bg-white rounded-xl w-60 text-center overflow-y-hidden" + (i == 0 ? " border-4 border-pink-300 shadow-md shadow-pink-500/100" : "")}
-                    initial={ {opacity: i == 0 ? 0 : 100, height: i == 0 ? 0 : "250px"} }
-                    animate={{ opacity: 100, height: "250px" }}
-                    transition={{ duration: 1 }}
-                    >
-                      <img src={e.image_uris?.small || e.card_faces[0].image_uris?.small}></img>
-                    </motion.div>
-                </div>
-              ))}
-          </div>
-          
-        </div>    
+          <CardView cards={gameState.guessedCards}/>
+            
+          </div>    
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if(gameState.phase == 2)
+  {
+    return (
+      <div className="w-full min-h-dvh flex flex-col items-center bg-black">
+        <div className="flex flex-col m-auto items-center bg-gray-500 size-80 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
+          {gameState.winner! == refPlayerIndex.current && <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">You won :D</div>}
+          {gameState.winner! != refPlayerIndex.current && <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">You lost :(</div>}
+          {gameState.rematch.map((e, i) => { 
+            if(e && i != refPlayerIndex.current) 
+            {
+              return <div>{gameState.players[i].name} wants a rematch!</div>
+            }})
+          }
+          
+          <button onClick={() => {
+              sendMessage(JSON.stringify({command: ClientCommand.rematch}))
+            }} 
+            className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Rematch?</button>
+          <button onClick={() => window.location.reload()} className="bg-white w-1/3 p-2 m-2 text-black hover:scale-105 hover:bg-gray-300">Exit</button>
+        </div>
+        <CardView cards={gameState.guessedCards}/>
+      </div>
+    )
+  }
+  
 }

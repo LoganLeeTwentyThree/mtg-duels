@@ -39,7 +39,7 @@ const SETTINGS : Phase = {
         newState.format = messageObj.format
       }
 
-      newState.players[wsId].itemIdUses = messageObj.itemIds.map((e : number) => [e, 1])
+      newState.players[wsId].itemIdUses = messageObj.itemIds.map((e : number) => [e, ALL_ITEMS[e].maxUses])
       newState.players[wsId].kitId = messageObj.kitId 
 
       if(newState.players![wsId ^ 1].kitId > -1)
@@ -97,7 +97,8 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
             lastGuessTimeStamp: new Date(),
             activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
             toast : "",
-            winner: isOver ? wsId as -1 | 0 | 1 : -1
+            winner: isOver ? wsId as -1 | 0 | 1 : -1,
+            phase: isOver ? 2 : 1
           }
           
           return newState
@@ -110,6 +111,7 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
 
     if(messageObj.command == ClientCommand.use)
     {
+      
       if(wsId != oldState.activePlayer)
       {
         return null
@@ -117,7 +119,7 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
       
       const itemId = messageObj.id
       
-      if (oldState.players[wsId].itemIdUses[itemId][1] <= 0)
+      if (oldState.players[wsId].itemIdUses[0][1] <= 0) //hard coded to be first item, need to fix
       {
         return null
       }
@@ -131,7 +133,7 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
 
     if(messageObj.command == ClientCommand.end)
     {
-      if(oldState.lastGuessTimeStamp && new Date().getSeconds() + 0.5 - oldState.lastGuessTimeStamp?.getSeconds() >= 20 && oldState.winner == -1)
+      if(oldState.lastGuessTimeStamp && new Date().getTime() + 1000 - oldState.lastGuessTimeStamp.getTime() >= 20000 && oldState.winner == -1)
       {
         const newState : Partial<GameState> = {
           winner: (oldState.activePlayer ^ 1) as -1 | 0 | 1,
