@@ -5,7 +5,7 @@ import { ALL_KITS } from "../Kits"
 import { ALL_ITEMS } from "../Items"
 
 
-// i wanted to put all phase stuff in another file, but there was a roblem with the imports
+// i wanted to put all phase stuff in another file, but there was a problem with the imports
 export interface Phase {
   id: number, 
   processRequest: (ws: WebSocket, message: ArrayBuffer | string, oldState: GameState, wsId: number) => Promise<Partial<GameState | null>> | null
@@ -34,20 +34,21 @@ const SETTINGS : Phase = {
       }
       
       
-      if(wsId == 0)//only the host can choose the format
-      {
-        newState.format = messageObj.format
-      }
-
-      newState.players[wsId].itemIdUses = messageObj.itemIds.map((e : number) => [e, ALL_ITEMS[e].maxUses])
-      newState.players[wsId].kitId = messageObj.kitId 
-
-      if(newState.players![wsId ^ 1].kitId > -1)
+      if(newState.players.length == 2 && newState.players![wsId ^ 1].kitId > -1)
       {
         newState = await GameStateHelpers.pushRandomCard(newState as GameState)
         
         newState.phase = 1
       }
+      
+      newState.players[wsId].itemIdUses = messageObj.itemIds.map((e : number) => [e, ALL_ITEMS[e].maxUses])
+      newState.players[wsId].kitId = messageObj.kitId 
+
+      if(wsId == 0)//only the host can choose the format
+      {
+        newState.format = messageObj.format.length == 0 ? "standard" : messageObj.format
+      }
+      
       return newState
     }
     return null
@@ -61,52 +62,52 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
     
     if(messageObj.command == ClientCommand.guess)
     {
-        if(oldState.activePlayer != wsId)
-        {
-            return null
+      if(oldState.activePlayer != wsId)
+      {
+        return null
+      }
+      
+      const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${oldState.format}`).all()
+      const guessedCard : Scry.Card | void = ((await result.next()).value)
+      
+      if(!guessedCard)
+      {
+        const newState : Partial<GameState> = {toast: `Invalid card`}
+        return newState
+      }
+      
+      if(GameStateHelpers.isLegalPlay(guessedCard!, oldState))
+      {
+        const player = oldState.players[wsId!]
+        const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
+        const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
+        
+        const newState : Partial<GameState> = {
+          players: oldState.players.map((e, i) => {
+              if( i == wsId )
+              {
+              return {
+                ...e,
+                points: newPoints,
+              }
+              }else {
+              return e
+              }
+            }), //important that players stay at same index
+          guessedCards: [...oldState.guessedCards, guessedCard],
+          lastGuessTimeStamp: new Date(),
+          activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
+          toast : "",
+          winner: isOver ? wsId as -1 | 0 | 1 : -1,
+          phase: isOver ? 2 : 1
         }
         
-        const result = Scry.Cards.search(`game:paper !"${messageObj.card}" format:${oldState.format}`).all()
-        const guessedCard : Scry.Card | void = ((await result.next()).value)
-        
-        if(!guessedCard)
-        {
-          const newState : Partial<GameState> = {toast: `Invalid card`}
-          return newState
-        }
-        
-        if(GameStateHelpers.isLegalPlay(guessedCard!, oldState))
-        {
-          const player = oldState.players[wsId!]
-          const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
-          const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
-          
-          const newState : Partial<GameState> = {
-            players: oldState.players.map((e, i) => {
-                if( i == wsId )
-                {
-                return {
-                  ...e,
-                  points: newPoints,
-                }
-                }else {
-                return e
-                }
-              }), //important that players stay at same index
-            guessedCards: [...oldState.guessedCards, guessedCard],
-            lastGuessTimeStamp: new Date(),
-            activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
-            toast : "",
-            winner: isOver ? wsId as -1 | 0 | 1 : -1,
-            phase: isOver ? 2 : 1
-          }
-          
-          return newState
-        }else
-        {
-          const newState : Partial<GameState> = {toast: `Invalid guess: ${guessedCard!.name}`}
-          return newState
-        }
+        return newState
+      }else
+      {
+        const newState : Partial<GameState> = {toast: `Invalid guess: ${guessedCard!.name}`}
+        return newState
+      }
     }
 
     if(messageObj.command == ClientCommand.use)
@@ -189,7 +190,7 @@ const ALL_PHASES : Array<Phase> = [SETTINGS, PLAY, END]
 
 
 export class MyDurableObject extends DurableObject<Env> {
-  currentGameState : GameState =  new GameState()
+  currentGameState : GameState 
   sessions : Map<WebSocket, number> = new Map()
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -205,6 +206,8 @@ export class MyDurableObject extends DurableObject<Env> {
       {
         this.sessions.set(ws, ws.deserializeAttachment())
       }
+    }else {
+      this.currentGameState = new GameState()
     }
   }
 
@@ -257,8 +260,11 @@ export class MyDurableObject extends DurableObject<Env> {
   updateGameState(updateClients : boolean, newState : Partial<GameState>)
   {
 
+
     Object.assign(this.currentGameState, newState)
+    
     try{
+      
       this.ctx.storage.kv.put("gamestate", this.currentGameState)
     }catch (e)
     {
