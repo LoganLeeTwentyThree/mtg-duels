@@ -39,15 +39,15 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
     const tutorial = 
     <div>
         <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">How to Play</div>
-        <div className="m-5">Take turns naming magic cards that relate to each other by having the same mana value (cmc), power, toughness, or set. The first one to fail to name a card in 20 seconds loses!</div>
+        <div className="m-5 p-2 bg-white w-70">Take turns naming magic cards that relate to each other by having the same mana value (cmc), power, toughness, or set. Kits allow you to play for an alternate win condition such as naming 10 creatures. If you reach your win condition, or yout opponent fails to name a card, you win!</div>
         <button onClick={() => setShowTutorial(false)} className="self-end m-auto p-1 bg-white text-black hover:bg-gray-300 hover:scale-105">Back</button>
     </div>
 
     return (
     <div className="flex flex-col justify-center items-center bg-black h-screen w-screen">
         <div className="text-white text-5xl">MTGDuels</div>
-        <motion.div initial={{opacity: 0, y: 100}} animate={{opacity: 100, y:0}} transition={{duration: 1, ease: "backOut"}}className="flex flex-row">
-            <div className="flex items-center bg-gray-500 size-80 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
+        <motion.div layout initial={{opacity: 0, y: 100}} animate={{opacity: 100, y:0}} transition={{duration: 1, ease: "backOut"}}className="flex flex-row">
+            <div className="flex items-center bg-gray-500 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
                 {showTutorial && tutorial}
                 {!showTutorial && body}
             </div>

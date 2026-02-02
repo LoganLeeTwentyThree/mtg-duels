@@ -175,7 +175,7 @@ const END : Phase = {
             activePlayer: (oldState.activePlayer ^ 1) as 0 | 1,
             players: oldState.players.map(p => ({
             ...p,
-            itemIdUses: [[p.itemIdUses[0][0], 1]],
+            itemIdUses: [[p.itemIdUses[0][0], ALL_ITEMS[p.itemIdUses[0][0]].maxUses]], //Fix when multiple items possible
             points: 0,
             })),
         }
@@ -304,6 +304,47 @@ export class MyDurableObject extends DurableObject<Env> {
 
 }
 
+export class MatchMaker extends DurableObject<Env> {
+  queue : Array<string>
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+
+    this.queue = this.ctx.storage.kv.get("queue") ?? new Array<string>()
+  }
+
+  async fetch(request: Request): Promise<Response> {
+
+    const url = new URL(request.url)
+
+    const format = url.searchParams.get("format") ?? "standard";
+    const name = url.searchParams.get("name") ?? "No Name";
+
+    // Creates two ends of a WebSocket connection.
+    const webSocketPair = new WebSocketPair();
+    const [client, server] = Object.values(webSocketPair);
+
+    // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
+    // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
+    // When the Durable Object receives a message during Hibernation, it will run the `constructor` to be re-initialized
+    this.ctx.acceptWebSocket(server);
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ) 
+  {
+    ws.close(code, "Durable Object is closing WebSocket"); 
+  }
+
+}
 
 //worker that handles initial requests
 export default {
@@ -313,7 +354,7 @@ export default {
     if (request.headers.get("Upgrade") === "websocket") {
       const lobby = url.searchParams.get("lobby") ?? "default";
       const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
-
+      
       if((await stub.getPlayers()) >= 2)
       {
         return new Response(JSON.stringify({error: "Server is full"}), {

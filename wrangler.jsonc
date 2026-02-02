@@ -13,6 +13,10 @@
       {
         "name": "MY_DURABLE_OBJECT",
         "class_name": "MyDurableObject"
+      },
+      {
+        "name": "MATCHMAKER",
+        "class_name": "MatchMaker"
       }
     ]
   },
@@ -24,5 +28,5 @@
       ]
     }
   ],
-  "main": "./worker/index.ts"
+  "main": "./worker/index.ts",
 }
