@@ -35,15 +35,15 @@ export const ESCAPE : Item = {
 export const DELAY : Item = {
     name: "Delay",
     use: async (oldState : GameState, wsId : number) => {
-        if(!oldState.lastGuessTimeStamp)
+        if(!oldState.endsAt)
         {
-            return {}
+            return {} 
         }
-        
+
         oldState.players[wsId].itemIdUses[0][1] -= 1 //FIX THIS TOO
-        oldState.lastGuessTimeStamp?.setSeconds(oldState.lastGuessTimeStamp.getSeconds() + 5)
+        oldState.endsAt.setSeconds(oldState.endsAt.getSeconds() + 5)
         return { 
-            lastGuessTimeStamp: oldState.lastGuessTimeStamp,
+            endsAt: oldState.endsAt,
             players: oldState.players.map((e, i) => {
                 if(i == wsId)
                 {

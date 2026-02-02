@@ -5,7 +5,7 @@
  {
     const {
         seconds,
-        } = useTimer({ expiryTimestamp: props.expiryTimeStamp, onExpire: props.onExpire});
+        } = useTimer({ expiryTimestamp: props.expiryTimeStamp, onExpire: props.onExpire, });
 
     return (
         <div className="flex items-center h-20 w-50 text-5xl bg-white"><div className='w-full text-center'>{seconds}</div></div>

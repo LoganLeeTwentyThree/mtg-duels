@@ -76,12 +76,12 @@ export default function Game(props: {lobbyCode : string, name: string}) {
   if(gameState.phase == 1)
   {
     
-    let timeRemaining = null
+    let expiryTimestamp = null
     
-    if(gameState.lastGuessTimeStamp)
+    if(gameState.endsAt)
     {
-      timeRemaining = new Date(gameState.lastGuessTimeStamp)
-      timeRemaining.setSeconds(timeRemaining.getSeconds() + 20)
+      const timeRemaining = new Date(gameState.endsAt).getTime() - new Date(gameState.startsAt).getTime()
+      expiryTimestamp = new Date( new Date().getTime() + timeRemaining )
     }
 
 
@@ -124,7 +124,7 @@ export default function Game(props: {lobbyCode : string, name: string}) {
               </div>
               
               {/* TIMER */}
-              {timeRemaining != null && gameState.winner! == -1 && <Timer key={timeRemaining.getTime()} expiryTimeStamp={timeRemaining!} onExpire={() => 
+              {expiryTimestamp != null && gameState.winner! == -1 && <Timer key={expiryTimestamp.getTime()} expiryTimeStamp={expiryTimestamp!} onExpire={() => 
                 {
                   sendMessage(JSON.stringify({command: ClientCommand.end}))
                 }}/>

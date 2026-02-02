@@ -95,7 +95,8 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
               }
             }), //important that players stay at same index
           guessedCards: [...oldState.guessedCards, guessedCard],
-          lastGuessTimeStamp: new Date(),
+          startsAt: new Date(),
+          endsAt: new Date(new Date().getTime() + 20 * 1000),
           activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
           toast : "",
           winner: isOver ? wsId as -1 | 0 | 1 : -1,
@@ -134,7 +135,7 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
 
     if(messageObj.command == ClientCommand.end)
     {
-      if(oldState.lastGuessTimeStamp && new Date().getTime() + 1000 - oldState.lastGuessTimeStamp.getTime() >= 20000 && oldState.winner == -1)
+      if(oldState.endsAt && new Date().getTime() - oldState.endsAt.getTime() >= 0 && oldState.winner == -1)
       {
         const newState : Partial<GameState> = {
           winner: (oldState.activePlayer ^ 1) as -1 | 0 | 1,
@@ -166,7 +167,8 @@ const END : Phase = {
         let newGame: GameState = {
             ...oldState,
             phase: 1,
-            lastGuessTimeStamp: null,
+            startsAt: new Date(),
+            endsAt: null,
             winner: -1,
             guessedCards: [],
             rematch: [false, false],

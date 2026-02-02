@@ -21,7 +21,8 @@ export class GameState {
   guessedCards: Array<Scry.Card> = []
   activePlayer: 0 | 1 = 0
   players: Array<Player> = []
-  lastGuessTimeStamp: Date | null = null
+  endsAt: Date | null = null
+  startsAt: Date = new Date()
   rematch: Array<boolean> = [false, false]
   toast?: string = ""
   format: keyof Scry.Legalities | "" = ""
@@ -34,7 +35,8 @@ export class GameStateHelpers {
   static pushCard(card : Scry.Card, state : GameState) {
     state.guessedCards.push(card)
     state.activePlayer = (state.activePlayer ^ 1) as 0 | 1
-    state.lastGuessTimeStamp = new Date()
+    state.startsAt = new Date()
+    state.endsAt = new Date(state.startsAt.getTime() + 20 * 1000)
     return state
   }
 
