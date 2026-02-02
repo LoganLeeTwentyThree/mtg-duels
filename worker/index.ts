@@ -219,7 +219,6 @@ export class MyDurableObject extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-
     const url = new URL(request.url)
 
     // Creates two ends of a WebSocket connection.
@@ -305,33 +304,59 @@ export class MyDurableObject extends DurableObject<Env> {
 }
 
 export class MatchMaker extends DurableObject<Env> {
-  queue : Array<string>
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-
-    this.queue = this.ctx.storage.kv.get("queue") ?? new Array<string>()
   }
 
   async fetch(request: Request): Promise<Response> {
-
     const url = new URL(request.url)
 
-    const format = url.searchParams.get("format") ?? "standard";
-    const name = url.searchParams.get("name") ?? "No Name";
+    const format : string = url.searchParams.get("format") ?? "standard";
 
     // Creates two ends of a WebSocket connection.
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
 
+    
+    //i guess if there are loooots of players it would be better to keep the queue sorted by format
+    const found = this.ctx.getWebSockets(format)
+
+   
+
+    if(found)
+    {
+      const uniqueId = this.env.MY_DURABLE_OBJECT.newUniqueId().name!
+      found[0].send(JSON.stringify({command: "Matched", lobby: uniqueId}))
+      server.serializeAttachment({ lobbyId: uniqueId })
+    }
+
+    
     // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
     // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
     // When the Durable Object receives a message during Hibernation, it will run the `constructor` to be re-initialized
     this.ctx.acceptWebSocket(server);
 
+    console.log(format)
+
     return new Response(null, {
       status: 101,
       webSocket: client,
     });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+    const messageObj = JSON.parse(message as string)
+    
+    if(messageObj.command = "Waiting")
+    {
+      const attachment = ws.deserializeAttachment()
+      console.log(attachment)
+
+      if(attachment.lobbyId)
+      {
+        ws.send(JSON.stringify({command: "Match", lobby: attachment.lobbyId}))
+      }
+    }
   }
 
   async webSocketClose(
@@ -352,20 +377,33 @@ export default {
     const url = new URL(request.url);
 
     if (request.headers.get("Upgrade") === "websocket") {
-      const lobby = url.searchParams.get("lobby") ?? "default";
-      const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
-      
-      if((await stub.getPlayers()) >= 2)
+      const mode = url.searchParams.get("mode") ?? "search"
+      if(mode === "lobby")
       {
-        return new Response(JSON.stringify({error: "Server is full"}), {
-          status: 403,
-          headers: {
-            'Content-Type' : 'application/json'
-          }
-        })
+        const lobby = url.searchParams.get("lobby") ?? "default";
+        const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
+        
+        if((await stub.getPlayers()) >= 2)
+        {
+          return new Response(JSON.stringify({error: "Server is full"}), {
+            status: 403,
+            headers: {
+              'Content-Type' : 'application/json'
+            }
+          })
+        }
+        
+        return stub.fetch(request);
+      }else
+      {
+        const stub = env.MATCHMAKER.getByName("MatchMaker");
+
+        
+        return stub.fetch(request)
+        
+        
       }
       
-      return stub.fetch(request);
     }
 
     return env.ASSETS.fetch(request);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "motion/react"
+import Queue from "./Queue"
 
 export default function Lobby( props : {callback : (result : Array<string>) => void})
 {
@@ -8,6 +9,7 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
 
     const [showTutorial, setShowTutorial] = useState(false)
     const [defaultName, setDefaultName] = useState("")
+    const [search, setSearch] = useState(false)
     
     useEffect(() => {
         async function cookie() {
@@ -50,6 +52,10 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
             <div className="flex items-center bg-gray-500 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
                 {showTutorial && tutorial}
                 {!showTutorial && body}
+            </div>
+            <div className="flex flex-col items-center bg-gray-500 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100">
+                <button className="bg-white" onClick={() => setSearch(true)}>Search for a game</button>
+                {search && <Queue format={"standard"} onMatchFound={(lobby) => props.callback([lobby, nameRef.current?.value!])} />}
             </div>
         </motion.div>
         

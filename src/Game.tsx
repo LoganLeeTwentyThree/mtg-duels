@@ -13,7 +13,7 @@ import { ALL_ITEMS } from '../Items';
 
 export default function Game(props: {lobbyCode : string, name: string}) {
 
-  const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?lobby=${props.lobbyCode}&name=${props.name}`);
+  const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?mode=lobby&lobby=${props.lobbyCode}&name=${props.name}`);
 
   const refGameState = useRef<GameState>( new GameState() )
   const refPlayerIndex = useRef<number>(-1)
