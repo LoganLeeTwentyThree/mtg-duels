@@ -11,7 +11,7 @@ import { ALL_KITS } from "../Kits"
 import { ALL_ITEMS } from '../Items';
 
 
-export default function Game(props: {lobbyCode : string, name: string}) {
+export default function Game(props: {lobbyCode : string, name: string, format? : string}) {
 
   const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?mode=lobby&lobby=${props.lobbyCode}&name=${props.name}`);
 
@@ -69,7 +69,14 @@ export default function Game(props: {lobbyCode : string, name: string}) {
 
   if(data.gameState.phase == 0)
   {
-    return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
+    if(props.format)
+    {
+      return (<Matchsettings selectFormat={false} onClick={(_, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: props.format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
+    }else
+    {
+      return (<Matchsettings selectFormat={data.playerIndex == 0} onClick={(format, kit, items) => sendMessage(JSON.stringify({command: ClientCommand.settings, format: format, kitId: kit.id, itemIds: items.map((e) => e.id)}))}/>)
+    }
+    
   }
 
   const gameState = refGameState.current

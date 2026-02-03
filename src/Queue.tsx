@@ -1,13 +1,25 @@
 import useWebSocket, { ReadyState } from "react-use-websocket";
+import { useEffect } from "react";
 
 interface QueueProps {
     format: string,
     onMatchFound: (lobby: string) => void
 }
 
-export default function Queue({format, onMatchFound} : QueueProps)
+export default function Queue({onMatchFound, format} : QueueProps)
 {
     const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?mode=search&format=${format}`);
+
+    useEffect(() => {
+        if(lastMessage)
+        {
+            const message = JSON.parse(lastMessage.data)
+            if(message.command === "Match")
+            {
+                onMatchFound(message.lobby)
+            }
+        }
+    }, [lastMessage])
 
     if(readyState === ReadyState.CLOSED)
     {
@@ -27,16 +39,7 @@ export default function Queue({format, onMatchFound} : QueueProps)
         
     }
 
-    if(lastMessage)
-    {
-        const message = JSON.parse(lastMessage.data)
-        console.log(message)
-        if(message.command === "Match")
-        {
-            onMatchFound(message.lobby)
-        }
-        
-    }else 
+    if(!lastMessage)
     {
         sendMessage(JSON.stringify({command : "Waiting"}))
     }

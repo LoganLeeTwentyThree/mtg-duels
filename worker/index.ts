@@ -321,12 +321,11 @@ export class MatchMaker extends DurableObject<Env> {
     //i guess if there are loooots of players it would be better to keep the queue sorted by format
     const found = this.ctx.getWebSockets(format)
 
-   
-
-    if(found)
+    if(found && found.length > 0)
     {
-      const uniqueId = this.env.MY_DURABLE_OBJECT.newUniqueId().name!
-      found[0].send(JSON.stringify({command: "Matched", lobby: uniqueId}))
+      console.log(found)
+      const uniqueId : string = this.env.MY_DURABLE_OBJECT.newUniqueId().toString()
+      found[0].send(JSON.stringify({command: "Match", lobby: uniqueId}))
       server.serializeAttachment({ lobbyId: uniqueId })
     }
 
@@ -334,9 +333,9 @@ export class MatchMaker extends DurableObject<Env> {
     // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
     // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
     // When the Durable Object receives a message during Hibernation, it will run the `constructor` to be re-initialized
-    this.ctx.acceptWebSocket(server);
+    this.ctx.acceptWebSocket(server, [format]);
 
-    console.log(format)
+    
 
     return new Response(null, {
       status: 101,

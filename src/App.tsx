@@ -16,8 +16,12 @@ export default function App() {
         
       )}
 
-      {lobbyCodeAndName.length != 0 && (
+      {lobbyCodeAndName.length == 2 && (
         <Game lobbyCode={lobbyCodeAndName[0]} name={lobbyCodeAndName[1]} />
+      )}
+
+      {lobbyCodeAndName.length == 3 && (
+        <Game lobbyCode={lobbyCodeAndName[0]} name={lobbyCodeAndName[1]} format={lobbyCodeAndName[2]}/>
       )}
     </div>
   );
