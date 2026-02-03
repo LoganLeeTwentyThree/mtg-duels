@@ -16,57 +16,127 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
         async function cookie() {
             cookieStore.get("name").then((e) => setDefaultName(e?.value ?? ""))
         }
-
         cookie()
     }, [])
 
-
     const body = 
-    <div className="m-auto">
-        <div className="w-full text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">Join a lobby</div>
-        <form className="flex flex-col" onSubmit={() => 
+    <div className="w-full">
+        <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
+            JOIN LOBBY
+        </div>
+        <form
+            className="flex flex-col gap-3"
+            onSubmit={() => 
             {
                 cookieStore.set("name", nameRef.current?.value ?? "")
-                if(codeRef.current?.value && codeRef.current?.value != "" && nameRef.current?.value && nameRef.current?.value != "")
+                if(codeRef.current?.value && nameRef.current?.value)
                 {
                     props.callback([codeRef.current?.value!, nameRef.current?.value!])
                 }
-            }}>
-            <input placeholder="Code" ref={codeRef} type="text" className="bg-white p-1 m-1 w-50"></input>
-            <input type="submit" className="bg-white p-1 m-1 hover:bg-gray-300 hover:scale-105"></input>
+            }}
+        >
+            <input
+                placeholder="Code"
+                ref={codeRef}
+                type="text"
+                className="bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none focus:border-pink-400"
+            />
+            <input
+                type="submit"
+                value="CONNECT"
+                className="bg-pink-500/10 text-pink-400 font-mono tracking-widest p-2 border border-pink-400/60 hover:bg-pink-500/20 transition"
+            />
         </form>
     </div>
 
     const tutorial = 
-    <div>
-        <div className="text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300">How to Play</div>
-        <div className="m-5 p-2 bg-white">Take turns naming magic cards that relate to each other by having the same mana value (cmc), power, toughness, or set. Kits allow you to play for an alternate win condition such as naming 10 creatures. If you reach your win condition, or yout opponent fails to name a card, you win!</div>
+    <div className="w-full">
+        <div className="text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60">
+            HOW TO PLAY
+        </div>
+        <div className="p-4 bg-black/70 text-pink-200 font-mono text-sm sm:text-base leading-relaxed border border-pink-300/30">
+            Take turns naming magic cards that relate to each other by having the same mana value (cmc), power, toughness, or set. Kits allow you to play for an alternate win condition such as naming 10 creatures. If you reach your win condition, or your opponent fails to name a card, you win!
+        </div>
     </div>
 
     return (
-    <div className="flex flex-col justify-center items-center bg-black h-screen w-screen">
-        <div className="text-white text-5xl m-5">MTGDuels</div>
-        <input placeholder="Your Name" defaultValue={defaultName} ref={nameRef} type="text" className="bg-white p-1 m-1 w-50"></input>
-        <motion.div layout initial={{opacity: 0, y: 100}} animate={{opacity: 100, y:0}} transition={{duration: 0.25}}className="flex flex-row">
-            <div className="flex items-center bg-gray-500 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100 w-70">
-                {showTutorial && tutorial}
-                {!showTutorial && body}
+    <div className="relative flex flex-col bg-gradient-to-br from-black via-gray-900 to-black min-h-screen w-screen overflow-x-hidden px-4">
+        <div className="flex flex-col items-center w-full flex-1 lg:justify-center">
+            {/* grid overlay */}
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(236,72,153,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(236,72,153,0.08)_1px,transparent_1px)] bg-[size:40px_40px]" />
+
+            <div className="relative text-pink-400 text-3xl sm:text-5xl font-mono tracking-[0.2em] mt-6 mb-4 drop-shadow-[0_0_20px_rgba(236,72,153,0.8)]">
+                MTGDUELS
             </div>
-            {!showTutorial && <div className="flex flex-col items-center bg-gray-500 m-5 p-5 border-2 border-pink-300 rounded-xl shadow-md shadow-pink-500/100 w-70">
-                <div className="text-xl bg-white p-2 mb-5 inset-shadow-sm inset-shadow-pink-300" onClick={() => setSearch(true)}>Search for a game</div>
-                {search && <Queue format={format} onMatchFound={(lobby) => props.callback([lobby, nameRef.current?.value!, format])} />}
-                {!search && 
-                <select className="bg-white" onChange={(e) => setFormat(e.target.value)}>
-                    <option value="standard">Standard</option>
-                    <option value="modern">Modern</option>
-                    <option value="commander">Commander</option>
-                    <option value="vintage">Vintage</option>
-                </select>}
-                <button className="w-50 mt-5 p-1 bg-white text-black hover:bg-gray-300 hover:scale-105" onClick={() => setSearch(true)}>Search</button>
-            </div>}
-        </motion.div>
-        <button onClick={() => setShowTutorial(!showTutorial)} className="w-50 m-1 p-1 bg-white text-black hover:bg-gray-300 hover:scale-105">{showTutorial ? "Back" : "How do I Play?"}</button>
-        
+
+            <input
+                placeholder="Your Name"
+                defaultValue={defaultName}
+                ref={nameRef}
+                type="text"
+                className="w-full max-w-sm bg-black/80 text-pink-300 font-mono p-2 mb-4 border border-pink-300/40 focus:outline-none"
+            />
+
+            <motion.div
+                layout
+                initial={{opacity: 0, y: 60}}
+                animate={{opacity: 1, y: 0}}
+                transition={{duration: 0.25}}
+                className="flex flex-col lg:flex-row gap-6 w-full max-w-4xl justify-center"
+            >
+                <motion.div
+                    className="relative w-full max-w-sm bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
+                >
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_95%,rgba(236,72,153,0.12)_100%)] bg-[size:100%_4px]" />
+                    {showTutorial ? tutorial : body}
+                </motion.div>
+
+                {!showTutorial && (
+                    <motion.div
+                        className="relative w-full max-w-sm bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
+                    >
+                        <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
+                            SEARCH GAME
+                        </div>
+
+                        {search && (
+                            <Queue
+                                format={format}
+                                onMatchFound={(lobby) =>
+                                    props.callback([lobby, nameRef.current?.value!, format])
+                                }
+                            />
+                        )}
+
+                        {!search && (
+                            <select
+                                className="w-full bg-black/80 text-pink-300 font-mono p-2 border border-pink-300/40"
+                                onChange={(e) => setFormat(e.target.value)}
+                            >
+                                <option value="standard">Standard</option>
+                                <option value="modern">Modern</option>
+                                <option value="commander">Commander</option>
+                                <option value="vintage">Vintage</option>
+                            </select>
+                        )}
+
+                        <button
+                            className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
+                            onClick={() => setSearch(true)}
+                        >
+                            SEARCH
+                        </button>
+                    </motion.div>
+                )}
+            </motion.div>
+
+            <button
+                onClick={() => setShowTutorial(!showTutorial)}
+                className="w-full max-w-sm mt-6 mb-8 p-2 bg-black/80 text-pink-400 font-mono tracking-widest border border-pink-400/50 hover:bg-pink-500/20 transition"
+            >
+                {showTutorial ? "BACK" : "HOW TO PLAY"}
+            </button>
+        </div>
     </div>
     )
 }
