@@ -175,7 +175,7 @@ const END : Phase = {
             activePlayer: (oldState.activePlayer ^ 1) as 0 | 1,
             players: oldState.players.map(p => ({
             ...p,
-            itemIdUses: [[p.itemIdUses[0][0], 1]],
+            itemIdUses: [[p.itemIdUses[0][0], ALL_ITEMS[p.itemIdUses[0][0]].maxUses]], //Fix when multiple items possible
             points: 0,
             })),
         }
@@ -219,7 +219,6 @@ export class MyDurableObject extends DurableObject<Env> {
   }
 
   async fetch(request: Request): Promise<Response> {
-
     const url = new URL(request.url)
 
     // Creates two ends of a WebSocket connection.
@@ -304,6 +303,72 @@ export class MyDurableObject extends DurableObject<Env> {
 
 }
 
+export class MatchMaker extends DurableObject<Env> {
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+  }
+
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url)
+
+    const format : string = url.searchParams.get("format") ?? "standard";
+
+    // Creates two ends of a WebSocket connection.
+    const webSocketPair = new WebSocketPair();
+    const [client, server] = Object.values(webSocketPair);
+
+    
+    //i guess if there are loooots of players it would be better to keep the queue sorted by format
+    const found = this.ctx.getWebSockets(format)
+
+    if(found && found.length > 0)
+    {
+      console.log(found)
+      const uniqueId : string = this.env.MY_DURABLE_OBJECT.newUniqueId().toString()
+      found[0].send(JSON.stringify({command: "Match", lobby: uniqueId}))
+      server.serializeAttachment({ lobbyId: uniqueId })
+    }
+
+    
+    // Calling `acceptWebSocket()` connects the WebSocket to the Durable Object, allowing the WebSocket to send and receive messages.
+    // Unlike `ws.accept()`, `state.acceptWebSocket(ws)` allows the Durable Object to be hibernated
+    // When the Durable Object receives a message during Hibernation, it will run the `constructor` to be re-initialized
+    this.ctx.acceptWebSocket(server, [format]);
+
+    
+
+    return new Response(null, {
+      status: 101,
+      webSocket: client,
+    });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+    const messageObj = JSON.parse(message as string)
+    
+    if(messageObj.command = "Waiting")
+    {
+      const attachment = ws.deserializeAttachment()
+      console.log(attachment)
+
+      if(attachment.lobbyId)
+      {
+        ws.send(JSON.stringify({command: "Match", lobby: attachment.lobbyId}))
+      }
+    }
+  }
+
+  async webSocketClose(
+    ws: WebSocket,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ) 
+  {
+    ws.close(code, "Durable Object is closing WebSocket"); 
+  }
+
+}
 
 //worker that handles initial requests
 export default {
@@ -311,20 +376,33 @@ export default {
     const url = new URL(request.url);
 
     if (request.headers.get("Upgrade") === "websocket") {
-      const lobby = url.searchParams.get("lobby") ?? "default";
-      const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
-
-      if((await stub.getPlayers()) >= 2)
+      const mode = url.searchParams.get("mode") ?? "search"
+      if(mode === "lobby")
       {
-        return new Response(JSON.stringify({error: "Server is full"}), {
-          status: 403,
-          headers: {
-            'Content-Type' : 'application/json'
-          }
-        })
+        const lobby = url.searchParams.get("lobby") ?? "default";
+        const stub = env.MY_DURABLE_OBJECT.getByName(env.MY_DURABLE_OBJECT.idFromName(lobby).name!);
+        
+        if((await stub.getPlayers()) >= 2)
+        {
+          return new Response(JSON.stringify({error: "Server is full"}), {
+            status: 403,
+            headers: {
+              'Content-Type' : 'application/json'
+            }
+          })
+        }
+        
+        return stub.fetch(request);
+      }else
+      {
+        const stub = env.MATCHMAKER.getByName("MatchMaker");
+
+        
+        return stub.fetch(request)
+        
+        
       }
       
-      return stub.fetch(request);
     }
 
     return env.ASSETS.fetch(request);

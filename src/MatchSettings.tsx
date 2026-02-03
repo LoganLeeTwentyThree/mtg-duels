@@ -71,7 +71,6 @@ export default function MatchSettings({ onClick, selectFormat }: MatchSettingsPr
                     ))}
             </select>
         </div>}
-
     </div>
 
     {!submitted && 
