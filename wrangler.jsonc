@@ -24,7 +24,12 @@
     {
       "tag": "v1",
       "new_sqlite_classes": [
-        "MyDurableObject",
+        "MyDurableObject"
+      ]
+    },
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
         "MatchMaker"
       ]
     }

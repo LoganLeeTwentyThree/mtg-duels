@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/CardView.tsx","./src/Game.tsx","./src/Lobby.tsx","./src/MatchSettings.tsx","./src/Search.tsx","./src/Timer.tsx","./src/main.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/CardView.tsx","./src/Game.tsx","./src/Lobby.tsx","./src/MatchSettings.tsx","./src/Queue.tsx","./src/Search.tsx","./src/Timer.tsx","./src/main.tsx"],"version":"5.9.3"}
