@@ -13,10 +13,6 @@
       {
         "name": "MY_DURABLE_OBJECT",
         "class_name": "MyDurableObject"
-      },
-      {
-        "name": "MATCHMAKER",
-        "class_name": "MatchMaker"
       }
     ]
   },
@@ -25,12 +21,6 @@
       "tag": "v1",
       "new_sqlite_classes": [
         "MyDurableObject"
-      ]
-    },
-    {
-      "tag": "v2",
-      "new_sqlite_classes": [
-        "MatchMaker"
       ]
     }
   ],
