@@ -1,17 +1,15 @@
 import useWebSocket, { ReadyState } from 'react-use-websocket'
 import Timer from "./Timer"
-import { useRef, useState } from "react"
+import { useRef, useEffect } from "react"
 import CardView from './CardView'
 import Search from "./Search"
-import Matchsettings from "./MatchSettings"
 import { GameState, ClientCommand } from "../Protocol"
 import { ALL_KITS } from "../Kits"
 import { ALL_ITEMS } from '../Items'
 
-export default function Game(props: { lobbyCode: string, name: string, format?: string }) {
+export default function Game(props: { lobbyCode: string, name: string, format: string, kitId: number, items: Array<number> }) {
 
-  const { sendMessage, lastMessage, readyState } =
-    useWebSocket(`/api?mode=lobby&lobby=${props.lobbyCode}&name=${props.name}`)
+  const { sendMessage, lastMessage, readyState } = useWebSocket(`/api?mode=lobby&lobby=${props.lobbyCode}&name=${props.name}`)
 
   const refGameState = useRef<GameState>(new GameState())
   const refPlayerIndex = useRef<number>(-1)
@@ -52,11 +50,8 @@ export default function Game(props: { lobbyCode: string, name: string, format?: 
     )
   }
 
-  if (readyState === ReadyState.CONNECTING || !lastMessage) {
-    if (!lastMessage) {
-      sendMessage(JSON.stringify({ command: ClientCommand.poll }))
-    }
-
+  if (!lastMessage) {
+    sendMessage(JSON.stringify({ command: ClientCommand.poll }))
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-pink-400 font-mono">
         <div className="bg-black/70 border border-pink-400/60 p-6 text-3xl shadow-[0_0_25px_rgba(236,72,153,0.6)] animate-pulse">
@@ -73,38 +68,44 @@ export default function Game(props: { lobbyCode: string, name: string, format?: 
   const data = JSON.parse(lastMessage.data)
   Object.assign(refGameState.current, data.gameState)
   refPlayerIndex.current = data.playerIndex
+  const gameState = refGameState.current
+  console.log(gameState)
 
-  if (data.gameState.phase === 0) {
+  if (gameState.phase == 0) {
+    if(gameState.players[refPlayerIndex.current].kitId != props.kitId)
+    {
+      
+      sendMessage(JSON.stringify({
+        command: ClientCommand.settings,
+        format: props.format,
+        kitId: props.kitId,
+        itemIds: props.items
+      }))
+    }
+    
+
     return (
-      <Matchsettings
-        selectFormat={!props.format && data.playerIndex === 0}
-        onClick={(format, kit, items) =>
-          sendMessage(JSON.stringify({
-            command: ClientCommand.settings,
-            format: props.format ?? format,
-            kitId: kit.id,
-            itemIds: items.map(e => e.id)
-          }))
-        }
-      />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-pink-400 font-mono">
+        <div className="bg-black/70 border border-pink-400/60 p-6 text-3xl shadow-[0_0_25px_rgba(236,72,153,0.6)] animate-pulse">
+          WAITING FOR OPPONENT...
+        </div>
+      </div>
+         
     )
   }
 
-  const gameState = refGameState.current
+
 
   /* =======================
      ACTIVE GAME
   ======================= */
 
-  if (gameState.phase === 1) {
+  if (gameState.phase == 1) {
 
     let expiryTimestamp = null
+
     if (gameState.endsAt) {
-      expiryTimestamp = new Date(
-        Date.now() +
-        (new Date(gameState.endsAt).getTime() -
-         new Date(gameState.startsAt).getTime())
-      )
+      expiryTimestamp = new Date(Date.now() + (new Date(gameState.endsAt).getTime() - new Date(gameState.startsAt).getTime()))
     }
 
     const isMyTurn = gameState.activePlayer === refPlayerIndex.current

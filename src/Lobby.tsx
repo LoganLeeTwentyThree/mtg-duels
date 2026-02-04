@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "motion/react"
 import Queue from "./Queue"
+import { ALL_KITS, CREATURES, Kit } from "../Kits"
+import { ALL_ITEMS, ESCAPE, Item } from "../Items"
+import { LobbyInfo } from "../Protocol"
 
-export default function Lobby( props : {callback : (result : Array<string>) => void})
+export default function Lobby( props : {callback : (result : LobbyInfo) => void})
 {
     const codeRef = useRef<HTMLInputElement | null>(null)
     const nameRef = useRef<HTMLInputElement | null>(null)
@@ -11,6 +14,9 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
     const [defaultName, setDefaultName] = useState("")
     const [search, setSearch] = useState(false)
     const [format, setFormat] = useState("standard")
+    const [kit, setKit] = useState<Kit>(CREATURES)
+    const [items, setItems] = useState<Array<Item>>([ESCAPE])
+    const [isPrivate, setIsPrivate] = useState<boolean>(false)
 
     useEffect(() => {
         async function cookie() {
@@ -21,32 +27,80 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
 
     const body = 
     <div className="w-full">
-        <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
-            JOIN LOBBY
-        </div>
-        <form
-            className="flex flex-col gap-3"
-            onSubmit={() => 
-            {
-                cookieStore.set("name", nameRef.current?.value ?? "")
-                if(codeRef.current?.value && nameRef.current?.value)
-                {
-                    props.callback([codeRef.current?.value!, nameRef.current?.value!])
-                }
-            }}
-        >
-            <input
-                placeholder="Code"
-                ref={codeRef}
-                type="text"
-                className="bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none focus:border-pink-400"
-            />
-            <input
-                type="submit"
-                value="CONNECT"
-                className="bg-pink-500/10 text-pink-400 font-mono tracking-widest p-2 border border-pink-400/60 hover:bg-pink-500/20 transition"
-            />
-        </form>
+        {isPrivate && <div>
+            <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
+                JOIN LOBBY
+            </div>
+            <div className="flex flex-col gap-3">
+                <input
+                    placeholder="Code"
+                    ref={codeRef}
+                    type="text"
+                    className="bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none focus:border-pink-400"
+                />
+                <button
+                    className="bg-pink-500/10 text-pink-400 font-mono tracking-widest p-2 border border-pink-400/60 hover:bg-pink-500/20 transition"
+                    onClick={() => 
+                    {
+                        cookieStore.set("name", nameRef.current?.value ?? "")
+                        if(codeRef.current?.value && nameRef.current?.value)
+                        {
+                            props.callback({
+                                code: codeRef.current?.value,
+                                name: nameRef.current?.value!, 
+                                format: format, 
+                                kitId: kit.id, 
+                                itemIds: items.map((e) => e.id)
+                            })
+                        }
+                    }}
+                >
+                    CONNECT
+                </button>
+                <button
+                    className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
+                    onClick={() => setIsPrivate(false)}
+                >
+                    FIND MATCH INSTEAD
+                </button>
+            </div>
+        </div>}
+
+
+        {!isPrivate && <div>
+            <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
+                SEARCH GAME
+            </div>
+
+            {search && (
+                <Queue
+                    format={format}
+                    onMatchFound={(lobby) =>
+                        props.callback({
+                                code: lobby,
+                                name: nameRef.current?.value!, 
+                                format: format, 
+                                kitId: kit.id, 
+                                itemIds: items.map((e) => e.id)
+                            })
+                    }
+                />
+            )}
+
+            <button
+                className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
+                onClick={() => setSearch(true)}
+            >
+                SEARCH
+            </button>
+            <button
+                className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
+                onClick={() => setIsPrivate(true)}
+            >
+                JOIN LOBBY INSTEAD
+            </button>
+        </div>}
+            
     </div>
 
     const tutorial = 
@@ -77,12 +131,24 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
                 className="w-full max-w-sm bg-black/80 text-pink-300 font-mono p-2 mb-4 border border-pink-300/40 focus:outline-none"
             />
 
+            {!search && (
+                <select
+                    className="w-full max-w-sm mb-4 bg-black/80 text-pink-300 font-mono p-2 border border-pink-300/40"
+                    onChange={(e) => setFormat(e.target.value)}
+                >
+                    <option value="standard">Standard</option>
+                    <option value="modern">Modern</option>
+                    <option value="commander">Commander</option>
+                    <option value="vintage">Vintage</option>
+                </select>
+            )}
+
             <motion.div
                 layout
                 initial={{opacity: 0, y: 60}}
                 animate={{opacity: 1, y: 0}}
                 transition={{duration: 0.25}}
-                className="flex flex-col lg:flex-row gap-6 w-full max-w-4xl justify-center"
+                className="flex flex-col items-center lg:flex-row gap-6 w-full max-w-4xl justify-center"
             >
                 <motion.div
                     className="relative w-full max-w-sm bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
@@ -91,43 +157,43 @@ export default function Lobby( props : {callback : (result : Array<string>) => v
                     {showTutorial ? tutorial : body}
                 </motion.div>
 
-                {!showTutorial && (
-                    <motion.div
-                        className="relative w-full max-w-sm bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
+                
+                {!showTutorial && <div className="relative flex flex-col items-center bg-black/70 w-full max-w-sm p-5 border border-pink-400/60 rounded-xl shadow-[0_0_30px_rgba(236,72,153,0.45)] backdrop-blur">
+                    <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
+                    BUILD KIT
+                    </div>
+    
+                    <div className="w-full text-sm font-mono tracking-widest text-pink-300 bg-black/70 p-2 mb-1 border border-pink-300/30 text-center">
+                    WIN CONDITION
+                    </div>
+    
+                    <select
+                    className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 mb-4 border border-pink-300/40 focus:outline-none"
+                    onChange={(e) => setKit(ALL_KITS[Number(e.target.value)])}
                     >
-                        <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
-                            SEARCH GAME
-                        </div>
-
-                        {search && (
-                            <Queue
-                                format={format}
-                                onMatchFound={(lobby) =>
-                                    props.callback([lobby, nameRef.current?.value!, format])
-                                }
-                            />
-                        )}
-
-                        {!search && (
-                            <select
-                                className="w-full bg-black/80 text-pink-300 font-mono p-2 border border-pink-300/40"
-                                onChange={(e) => setFormat(e.target.value)}
-                            >
-                                <option value="standard">Standard</option>
-                                <option value="modern">Modern</option>
-                                <option value="commander">Commander</option>
-                                <option value="vintage">Vintage</option>
-                            </select>
-                        )}
-
-                        <button
-                            className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
-                            onClick={() => setSearch(true)}
-                        >
-                            SEARCH
-                        </button>
-                    </motion.div>
-                )}
+                    {ALL_KITS.map(e => (
+                        <option key={e.id} value={e.id}>
+                        {e.name}
+                        </option>
+                    ))}
+                    </select>
+    
+                    <div className="w-full text-sm font-mono tracking-widest text-pink-300 bg-black/70 p-2 mb-1 border border-pink-300/30 text-center">
+                    ITEMS
+                    </div>
+    
+                    <select
+                    className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none"
+                    onChange={(e) => setItems([ALL_ITEMS[Number(e.target.value)]])}
+                    >
+                    {ALL_ITEMS.map(e => (
+                        <option key={e.name} value={e.id}>
+                        {e.name}
+                        </option>
+                    ))}
+                    </select>
+                </div>}
+                    
             </motion.div>
 
             <button

@@ -25,6 +25,12 @@ const SETTINGS : Phase = {
 
     if(messageObj.command == ClientCommand.settings)
     {
+      //dont process multiple times
+      if(oldState.players[wsId].kitId > -1)
+      {
+        return null
+      }
+
       let newState = 
       {
         format: oldState.format,
@@ -46,7 +52,7 @@ const SETTINGS : Phase = {
 
       if(wsId == 0)//only the host can choose the format
       {
-        newState.format = messageObj.format.length == 0 ? "standard" : messageObj.format
+        newState.format = messageObj.format
       }
       
       return newState

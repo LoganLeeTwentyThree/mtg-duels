@@ -9,12 +9,19 @@ export enum ClientCommand {
   use = "use"
 }
 
-
 export type Player = {
   name : string,
   kitId : number,
   points: number,
   itemIdUses: Array<Array<number>>
+}
+
+export type LobbyInfo = {
+  code: string,
+  name: string,
+  format: string,
+  kitId: number,
+  itemIds: Array<number>
 }
 
 export class GameState {

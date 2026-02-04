@@ -1,27 +1,23 @@
 import { useState } from "react";
 import Game from "./Game";
 import Lobby from "./Lobby";
-
+import { LobbyInfo } from "../Protocol";
 
 
 export default function App() {
-  const [lobbyCodeAndName, setLobbyCodeAndName] = useState<Array<string>>([])
+  const [lobbyInfo, setLobbyInfo] = useState<LobbyInfo>()
 
   return (
     <div>
-      {lobbyCodeAndName.length == 0 && (
+      {!lobbyInfo && (
         <div className="flex-1"> 
-          <Lobby callback={setLobbyCodeAndName} />
+          <Lobby callback={setLobbyInfo} />
         </div>
         
       )}
 
-      {lobbyCodeAndName.length == 2 && (
-        <Game lobbyCode={lobbyCodeAndName[0]} name={lobbyCodeAndName[1]} />
-      )}
-
-      {lobbyCodeAndName.length == 3 && (
-        <Game lobbyCode={lobbyCodeAndName[0]} name={lobbyCodeAndName[1]} format={lobbyCodeAndName[2]}/>
+      {lobbyInfo && (
+        <Game lobbyCode={lobbyInfo.code} name={lobbyInfo.name} format={lobbyInfo.format} kitId={lobbyInfo.kitId} items={lobbyInfo.itemIds}/>
       )}
     </div>
   );
