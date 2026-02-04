@@ -78,12 +78,16 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
       
       if(!guessedCard)
       {
-        const newState : Partial<GameState> = {toast: `Invalid card`}
+        const newState : Partial<GameState> = {toast: `Invalid card: ${messageObj.card}`}
         return newState
       }
       
-      if(GameStateHelpers.isLegalPlay(guessedCard!, oldState))
+      if(!GameStateHelpers.isLegalPlay(guessedCard, oldState))
       {
+        const newState : Partial<GameState> = {toast: `Invalid card: ${guessedCard.name}`}
+        return newState
+      }
+
         const player = oldState.players[wsId!]
         const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
         const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
@@ -107,14 +111,12 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
           toast : "",
           winner: isOver ? wsId as -1 | 0 | 1 : -1,
           phase: isOver ? 2 : 1
+
         }
         
+        
         return newState
-      }else
-      {
-        const newState : Partial<GameState> = {toast: `Invalid guess: ${guessedCard!.name}`}
-        return newState
-      }
+      
     }
 
     if(messageObj.command == ClientCommand.use)
@@ -329,7 +331,6 @@ export class MatchMaker extends DurableObject<Env> {
 
     if(found && found.length > 0)
     {
-      console.log(found)
       const uniqueId : string = this.env.MY_DURABLE_OBJECT.newUniqueId().toString()
       found[0].send(JSON.stringify({command: "Match", lobby: uniqueId}))
       server.serializeAttachment({ lobbyId: uniqueId })
