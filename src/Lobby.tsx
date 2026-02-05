@@ -11,16 +11,24 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
     const nameRef = useRef<HTMLInputElement | null>(null)
 
     const [showTutorial, setShowTutorial] = useState(false)
-    const [defaultName, setDefaultName] = useState("")
     const [search, setSearch] = useState(false)
     const [format, setFormat] = useState("standard")
     const [kit, setKit] = useState<Kit>(CREATURES)
-    const [items, setItems] = useState<Array<Item>>([ESCAPE])
+    const [items, setItems] = useState<Array<Item>>([ESCAPE, ESCAPE])
     const [isPrivate, setIsPrivate] = useState<boolean>(false)
+
+    const [defaultName, setDefaultName] = useState("")
+    const [defaultFormat, setDefaultFormat] = useState("standard")
+    const [defaultKit, setDefaultKit] = useState("")
+    const [defaultItem, setDefaultItem] = useState("")
 
     useEffect(() => {
         async function cookie() {
             cookieStore.get("name").then((e) => setDefaultName(e?.value ?? ""))
+            cookieStore.get("format").then((e) => setDefaultFormat(e?.value ?? "standard"))
+            cookieStore.get("kit").then((e) => setDefaultKit(e?.value ?? "0"))
+            cookieStore.get("item").then((e) => setDefaultItem(e?.value ?? "0"))
+
         }
         cookie()
     }, [])
@@ -42,7 +50,7 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="bg-pink-500/10 text-pink-400 font-mono tracking-widest p-2 border border-pink-400/60 hover:bg-pink-500/20 transition"
                     onClick={() => 
                     {
-                        cookieStore.set("name", nameRef.current?.value ?? "")
+                        console.log(items)
                         if(codeRef.current?.value && nameRef.current?.value)
                         {
                             props.callback({
@@ -127,6 +135,7 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                 placeholder="Your Name"
                 defaultValue={defaultName}
                 ref={nameRef}
+                onChange={() => cookieStore.set("name", nameRef.current?.value ?? "")}
                 type="text"
                 className="w-full max-w-sm bg-black/80 text-pink-300 font-mono p-2 mb-4 border border-pink-300/40 focus:outline-none"
             />
@@ -134,7 +143,11 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
             {!search && (
                 <select
                     className="w-full max-w-sm mb-4 bg-black/80 text-pink-300 font-mono p-2 border border-pink-300/40"
-                    onChange={(e) => setFormat(e.target.value)}
+                    onChange={(e) => {
+                        setFormat(e.target.value)
+                        cookieStore.set("format", e.target.value ?? "")
+                    }}
+                    defaultValue={defaultFormat}
                 >
                     <option value="standard">Standard</option>
                     <option value="modern">Modern</option>
@@ -169,7 +182,12 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
     
                     <select
                     className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 mb-4 border border-pink-300/40 focus:outline-none"
-                    onChange={(e) => setKit(ALL_KITS[Number(e.target.value)])}
+                    onChange={(e) => {
+                            setKit(ALL_KITS[Number(e.target.value)])
+                            cookieStore.set("kit", e.target.value)
+                        }
+                    }
+                    defaultValue={defaultKit}
                     >
                     {ALL_KITS.map(e => (
                         <option key={e.id} value={e.id}>
@@ -184,7 +202,26 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
     
                     <select
                     className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none"
-                    onChange={(e) => setItems([ALL_ITEMS[Number(e.target.value)]])}
+                    onChange={(e) => {
+                            setItems([ALL_ITEMS[Number(e.target.value)], items[1]])
+                            cookieStore.set("item", e.target.value)
+                        }}
+                    defaultValue={defaultItem}
+                    >
+                    {ALL_ITEMS.map(e => (
+                        <option key={e.name} value={e.id}>
+                        {e.name}
+                        </option>
+                    ))}
+                    </select>
+
+                    <select
+                    className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none"
+                    onChange={(e) => {
+                            setItems([items[0], ALL_ITEMS[Number(e.target.value)]])
+                            cookieStore.set("item", e.target.value)
+                        }}
+                    defaultValue={defaultItem}
                     >
                     {ALL_ITEMS.map(e => (
                         <option key={e.name} value={e.id}>

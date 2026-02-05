@@ -14,6 +14,15 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
   const refGameState = useRef<GameState>(new GameState())
   const refPlayerIndex = useRef<number>(-1)
 
+  useEffect(() => {
+    sendMessage(JSON.stringify({
+        command: ClientCommand.settings,
+        format: props.format,
+        kitId: props.kitId,
+        itemIds: props.items
+    }))
+  }, [])
+
   /* =======================
      CONNECTION STATES
   ======================= */
@@ -51,7 +60,6 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
   }
 
   if (!lastMessage) {
-    sendMessage(JSON.stringify({ command: ClientCommand.poll }))
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-pink-400 font-mono">
         <div className="bg-black/70 border border-pink-400/60 p-6 text-3xl shadow-[0_0_25px_rgba(236,72,153,0.6)] animate-pulse">
@@ -72,35 +80,21 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
   console.log(gameState)
 
   if (gameState.phase == 0) {
-    if(gameState.players[refPlayerIndex.current].kitId != props.kitId)
-    {
-      
-      sendMessage(JSON.stringify({
-        command: ClientCommand.settings,
-        format: props.format,
-        kitId: props.kitId,
-        itemIds: props.items
-      }))
-    }
-    
-
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-pink-400 font-mono">
         <div className="bg-black/70 border border-pink-400/60 p-6 text-3xl shadow-[0_0_25px_rgba(236,72,153,0.6)] animate-pulse">
           WAITING FOR OPPONENT...
         </div>
       </div>
-         
     )
   }
-
-
 
   /* =======================
      ACTIVE GAME
   ======================= */
 
   if (gameState.phase == 1) {
+
 
     let expiryTimestamp = null
 
@@ -137,9 +131,9 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
             {/* ME */}
             <div className="grid grid-rows-2 gap-2">
               <div className="flex gap-2">
-                {gameState.players[refPlayerIndex.current].itemIdUses.map(e => (
+                {gameState.players[refPlayerIndex.current].itemIdUses.map( (e, i) => (
                   <div
-                    key={`${e[0]}-${e[1]}`}
+                    key={`${e[0] + i} - 0`}
                     className={`w-20 h-14 flex items-center justify-center border
                       ${e[1] > 0
                         ? "border-pink-400/60 hover:bg-pink-500/20 hover:scale-105 cursor-pointer"
@@ -149,12 +143,12 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
                       sendMessage(JSON.stringify({ command: ClientCommand.use, id: e[0] }))
                     }
                   >
-                    {ALL_ITEMS[e[0]].name} × {e[1]}
+                    {ALL_ITEMS[e[0]].name} x {e[1]}
                   </div>
                 ))}
               </div>
 
-              <div className={`p-3 border ${isMyTurn ? "border-green-400" : "border-gray-500"} text-center`}>
+              <div className={`p-3 border ${isMyTurn ? "border-green-600" : "border-gray-500"} text-center bg-black/70`}>
                 <div>{props.name}</div>
                 <div>{myKit.name}</div>
                 <div>{gameState.players[refPlayerIndex.current].points} / {myKit.points}</div>
@@ -173,18 +167,18 @@ export default function Game(props: { lobbyCode: string, name: string, format: s
             {/* OPPONENT */}
             <div className="grid grid-rows-2 gap-2">
               <div className="flex gap-2">
-                {gameState.players[refPlayerIndex.current ^ 1].itemIdUses.map(e => (
+                {gameState.players[refPlayerIndex.current ^ 1].itemIdUses.map( (e, i) => (
                   <div
-                    key={`${e[0]}-${e[1]}`}
+                    key={`${e[0] + i} - 1`}
                     className={`w-20 h-14 flex items-center justify-center border
                       ${e[1] > 0 ? "border-pink-400/40" : "border-gray-600 opacity-40"}`}
                   >
-                    {ALL_ITEMS[e[0]].name} × {e[1]}
+                    {ALL_ITEMS[e[0]].name} x {e[1]}
                   </div>
                 ))}
               </div>
 
-              <div className={`p-3 border ${!isMyTurn ? "border-green-400" : "border-gray-500"} text-center`}>
+              <div className={`p-3 border ${!isMyTurn ? "border-green-600" : "border-gray-500"} text-center bg-black/70`}>
                 <div>{gameState.players[refPlayerIndex.current ^ 1].name}</div>
                 <div>{theirKit.name}</div>
                 <div>{gameState.players[refPlayerIndex.current ^ 1].points} / {theirKit.points}</div>

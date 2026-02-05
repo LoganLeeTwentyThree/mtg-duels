@@ -1,7 +1,6 @@
 import * as Scry from "scryfall-sdk"
 
 export enum ClientCommand {
-  poll = "poll",
   settings = "settings",
   guess = "guess",
   end = "end",
@@ -35,11 +34,13 @@ export class GameState {
   format: keyof Scry.Legalities | "" = ""
   winner: -1 | 0 | 1 = -1
   phase: number = 0
+  isBlocked: boolean = false
 }
 
 export class GameStateHelpers {
 
-  static pushCard(card : Scry.Card, state : GameState) {
+  static pushCard(card : Scry.Card, state : GameState) : GameState 
+  {
     state.guessedCards.push(card)
     state.activePlayer = (state.activePlayer ^ 1) as 0 | 1
     state.startsAt = new Date()
@@ -47,7 +48,7 @@ export class GameStateHelpers {
     return state
   }
 
-  static async pushRandomCard(state : GameState)
+  static async pushRandomCard(state : GameState) : Promise<GameState>
   {
     const random = await Scry.Cards.random(`format:${state.format} -type:land`)
     if(random)

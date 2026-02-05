@@ -17,12 +17,6 @@ const SETTINGS : Phase = {
   {
     const messageObj = JSON.parse(message as string)
 
-    if(messageObj.command == ClientCommand.poll)
-    {
-      ws.send(JSON.stringify({gameState: oldState, playerIndex: wsId}))
-      return null   
-    }
-
     if(messageObj.command == ClientCommand.settings)
     {
       //dont process multiple times
@@ -88,46 +82,53 @@ processRequest: async (ws: WebSocket, message: ArrayBuffer | string, oldState: G
         return newState
       }
 
-        const player = oldState.players[wsId!]
-        const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
-        const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
-        
-        const newState : Partial<GameState> = {
-          players: oldState.players.map((e, i) => {
-              if( i == wsId )
-              {
-              return {
-                ...e,
-                points: newPoints,
-              }
-              }else {
-              return e
-              }
-            }), //important that players stay at same index
-          guessedCards: [...oldState.guessedCards, guessedCard],
-          startsAt: new Date(),
-          endsAt: new Date(new Date().getTime() + 20 * 1000),
-          activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
-          toast : "",
-          winner: isOver ? wsId as -1 | 0 | 1 : -1,
-          phase: isOver ? 2 : 1
+      const player = oldState.players[wsId!]
 
-        }
-        
-        
+      if(oldState.isBlocked && (ALL_KITS[player.kitId]).isWin(guessedCard))
+      {
+        const newState : Partial<GameState> = {toast: `Invalid card: ${guessedCard.name}. (Your win condition is blocked this turn!)`}
         return newState
+      }
+
+      const newPoints = player.points + ((ALL_KITS[player.kitId]).isWin(guessedCard) ? 1 : 0)
+      const isOver = newPoints >= (ALL_KITS[player.kitId].points) ? true : false
+      
+      const newState : Partial<GameState> = {
+        players: oldState.players.map((e, i) => {
+            if( i == wsId )
+            {
+            return {
+              ...e,
+              points: newPoints,
+            }
+            }else {
+            return e
+            }
+          }), //important that players stay at same index
+        guessedCards: [...oldState.guessedCards, guessedCard],
+        startsAt: new Date(),
+        endsAt: new Date(new Date().getTime() + 20 * 1000),
+        activePlayer : (oldState.activePlayer ^ 1) as 0 | 1,
+        toast : "",
+        winner: isOver ? wsId as -1 | 0 | 1 : -1,
+        phase: isOver ? 2 : 1,
+        isBlocked: false,
+      } 
+        
+        
+      return newState
       
     }
 
     if(messageObj.command == ClientCommand.use)
     {
-      
-      if(wsId != oldState.activePlayer)
+      const itemId = messageObj.id
+
+      //im sure theres a better way to do this, but for now this allows you to block on other players turn
+      if(wsId != oldState.activePlayer && itemId != 2)
       {
         return null
       }
-      
-      const itemId = messageObj.id
       
       if (oldState.players[wsId].itemIdUses[0][1] <= 0) //hard coded to be first item, need to fix
       {
@@ -356,8 +357,7 @@ export class MatchMaker extends DurableObject<Env> {
     if(messageObj.command = "Waiting")
     {
       const attachment = ws.deserializeAttachment()
-      console.log(attachment)
-
+      
       if(attachment.lobbyId)
       {
         ws.send(JSON.stringify({command: "Match", lobby: attachment.lobbyId}))
