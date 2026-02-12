@@ -4,6 +4,7 @@ import Queue from "./Queue"
 import { ALL_KITS, CREATURES, Kit } from "../Kits"
 import { ALL_ITEMS, ESCAPE, Item } from "../Items"
 import { LobbyInfo } from "../Protocol"
+import { useCookies } from 'react-cookie';
 
 export default function Lobby( props : {callback : (result : LobbyInfo) => void})
 {
@@ -16,22 +17,13 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
     const [kit, setKit] = useState<Kit>(CREATURES)
     const [items, setItems] = useState<Array<Item>>([ESCAPE, ESCAPE])
     const [isPrivate, setIsPrivate] = useState<boolean>(false)
+    const [cookies, setCookie] = useCookies(['name', 'format', 'kit', 'item1', 'item2']);
 
-    const [defaultName, setDefaultName] = useState("")
-    const [defaultFormat, setDefaultFormat] = useState("standard")
-    const [defaultKit, setDefaultKit] = useState("")
-    const [defaultItem, setDefaultItem] = useState("")
-
-    useEffect(() => {
-        async function cookie() {
-            cookieStore.get("name").then((e) => setDefaultName(e?.value ?? ""))
-            cookieStore.get("format").then((e) => setDefaultFormat(e?.value ?? "standard"))
-            cookieStore.get("kit").then((e) => setDefaultKit(e?.value ?? "0"))
-            cookieStore.get("item").then((e) => setDefaultItem(e?.value ?? "0"))
-
-        }
-        cookie()
-    }, [])
+    const [defaultName] = useState(cookies.name)
+    const [defaultFormat] = useState(cookies.format)
+    const [defaultKit] = useState(cookies.kit)
+    const [defaultItem1] = useState(cookies.item1)
+    const [defaultItem2] = useState(cookies.item2)
 
     const body = 
     <div className="w-full">
@@ -50,7 +42,6 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="bg-pink-500/10 text-pink-400 font-mono tracking-widest p-2 border border-pink-400/60 hover:bg-pink-500/20 transition"
                     onClick={() => 
                     {
-                        console.log(items)
                         if(codeRef.current?.value && nameRef.current?.value)
                         {
                             props.callback({
@@ -103,7 +94,12 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
             </button>
             <button
                 className="w-full mt-4 p-2 bg-pink-500/10 text-pink-400 font-mono tracking-widest border border-pink-400/60 hover:bg-pink-500/20 transition"
-                onClick={() => setIsPrivate(true)}
+                onClick={() => 
+                    {
+                        setIsPrivate(true)
+                        setSearch(false)
+                    }
+                }
             >
                 JOIN LOBBY INSTEAD
             </button>
@@ -135,7 +131,7 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                 placeholder="Your Name"
                 defaultValue={defaultName}
                 ref={nameRef}
-                onChange={() => cookieStore.set("name", nameRef.current?.value ?? "")}
+                onChange={() => setCookie("name", nameRef.current?.value ?? "")}
                 type="text"
                 className="w-full max-w-sm bg-black/80 text-pink-300 font-mono p-2 mb-4 border border-pink-300/40 focus:outline-none"
             />
@@ -145,7 +141,7 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="w-full max-w-sm mb-4 bg-black/80 text-pink-300 font-mono p-2 border border-pink-300/40"
                     onChange={(e) => {
                         setFormat(e.target.value)
-                        cookieStore.set("format", e.target.value ?? "")
+                        setCookie("format", e.target.value ?? "")
                     }}
                     defaultValue={defaultFormat}
                 >
@@ -164,14 +160,14 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                 className="flex flex-col items-center lg:flex-row gap-6 w-full max-w-4xl justify-center"
             >
                 <motion.div
-                    className="relative w-full max-w-sm bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
+                    className="relative w-full max-w-sm min-h-85 bg-black/70 p-5 border border-pink-400/60 rounded-xl shadow-[0_0_25px_rgba(236,72,153,0.45)] backdrop-blur"
                 >
                     <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_95%,rgba(236,72,153,0.12)_100%)] bg-[size:100%_4px]" />
                     {showTutorial ? tutorial : body}
                 </motion.div>
 
                 
-                {!showTutorial && <div className="relative flex flex-col items-center bg-black/70 w-full max-w-sm p-5 border border-pink-400/60 rounded-xl shadow-[0_0_30px_rgba(236,72,153,0.45)] backdrop-blur">
+                {!showTutorial && <div className="relative h-85 flex flex-col items-center bg-black/70 w-full max-w-sm p-5 border border-pink-400/60 rounded-xl shadow-[0_0_30px_rgba(236,72,153,0.45)] backdrop-blur">
                     <div className="w-full text-lg sm:text-xl font-mono tracking-widest text-pink-400 bg-black/70 p-3 mb-4 border border-pink-400/60 shadow-[0_0_20px_rgba(236,72,153,0.35)]">
                     BUILD KIT
                     </div>
@@ -184,7 +180,7 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 mb-4 border border-pink-300/40 focus:outline-none"
                     onChange={(e) => {
                             setKit(ALL_KITS[Number(e.target.value)])
-                            cookieStore.set("kit", e.target.value)
+                            setCookie("kit", e.target.value)
                         }
                     }
                     defaultValue={defaultKit}
@@ -204,9 +200,9 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none"
                     onChange={(e) => {
                             setItems([ALL_ITEMS[Number(e.target.value)], items[1]])
-                            cookieStore.set("item", e.target.value)
+                            setCookie("item1", e.target.value)
                         }}
-                    defaultValue={defaultItem}
+                    defaultValue={defaultItem1}
                     >
                     {ALL_ITEMS.map(e => (
                         <option key={e.name} value={e.id}>
@@ -219,9 +215,9 @@ export default function Lobby( props : {callback : (result : LobbyInfo) => void}
                     className="w-full bg-black/80 text-pink-300 font-mono tracking-wider p-2 border border-pink-300/40 focus:outline-none"
                     onChange={(e) => {
                             setItems([items[0], ALL_ITEMS[Number(e.target.value)]])
-                            cookieStore.set("item", e.target.value)
+                            setCookie("item2", e.target.value)
                         }}
-                    defaultValue={defaultItem}
+                    defaultValue={defaultItem2}
                     >
                     {ALL_ITEMS.map(e => (
                         <option key={e.name} value={e.id}>
